@@ -1,0 +1,104 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Еженедельное сканирование по воскресеньям
+    - cron: '0 2 * * 0'
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Получить полную историю для сканирования
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install detect-secrets[YAML] bandit safety
+
+    - name: Scan for secrets
+      run: |
+        echo "🔍 Сканирование на наличие секретов..."
+        detect-secrets scan --baseline .secrets.baseline . || true
+        
+        # Проверяем, есть ли новые секреты
+        if detect-secrets audit .secrets.baseline --report | grep -q "UNVERIFIED"; then
+          echo "❌ Обнаружены потенциальные секреты!"
+          detect-secrets audit .secrets.baseline --report
+          exit 1
+        else
+          echo "✅ Секреты не обнаружены"
+        fi
+
+    - name: Security audit with Bandit
+      run: |
+        echo "🔍 Сканирование кода на уязвимости..."
+        bandit -r . -f json -o bandit-report.json || true
+        
+        # Проверяем критические уязвимости
+        if jq '.results[] | select(.issue_severity == "HIGH" or .issue_severity == "MEDIUM")' bandit-report.json | grep -q .; then
+          echo "❌ Обнаружены критические уязвимости!"
+          cat bandit-report.json
+          exit 1
+        else
+          echo "✅ Критические уязвимости не обнаружены"
+        fi
+
+    - name: Check for .env files
+      run: |
+        echo "🔍 Проверка на наличие .env файлов..."
+        if find . -name "*.env" -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./venv/*" | grep -q .; then
+          echo "❌ Обнаружены .env файлы в репозитории!"
+          find . -name "*.env" -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./venv/*"
+          exit 1
+        else
+          echo "✅ .env файлы не обнаружены"
+        fi
+
+    - name: Check for hardcoded secrets
+      run: |
+        echo "🔍 Проверка на хардкод секретов..."
+        if grep -r -i -E "(password|secret|token|key|api|auth).*=.*[a-zA-Z0-9]{20,}" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=venv --exclude-dir=.pytest_cache | grep -v "example\|test\|mock" | grep -q .; then
+          echo "❌ Обнаружены потенциально хардкод секреты!"
+          grep -r -i -E "(password|secret|token|key|api|auth).*=.*[a-zA-Z0-9]{20,}" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=venv --exclude-dir=.pytest_cache | grep -v "example\|test\|mock"
+          exit 1
+        else
+          echo "✅ Хардкод секреты не обнаружены"
+        fi
+
+    - name: Dependency security check
+      run: |
+        echo "🔍 Проверка зависимостей на уязвимости..."
+        safety check --json --output safety-report.json || true
+        
+        # Проверяем критические уязвимости
+        if jq '.vulnerabilities[] | select(.severity == "HIGH" or .severity == "MEDIUM")' safety-report.json | grep -q .; then
+          echo "❌ Обнаружены уязвимости в зависимостях!"
+          cat safety-report.json
+          exit 1
+        else
+          echo "✅ Уязвимости в зависимостях не обнаружены"
+        fi
+
+    - name: Upload security reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+        retention-days: 30
