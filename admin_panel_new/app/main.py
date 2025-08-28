@@ -67,6 +67,12 @@ app.add_middleware(
 
 logger.info("CORS middleware added")
 
+# Подключаем auth роутер
+from app.api.auth import router as auth_router
+app.include_router(auth_router, prefix="/api")
+
+logger.info("Auth router included")
+
 # Pydantic модели для текстов
 class BotTextCreate(BaseModel):
     category: str

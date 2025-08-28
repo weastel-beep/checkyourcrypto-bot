@@ -211,15 +211,15 @@
                   <strong>Текст:</strong> {{ stage.text_key || 'Не задан' }}
                 </div>
                 
-                <div class="stage-buttons" v-if="stage.buttons?.length">
-                  <strong>Кнопки:</strong>
-                  <div class="buttons-preview">
+                <div class="stage-conditions" v-if="stage.conditions?.length">
+                  <strong>Условия:</strong>
+                  <div class="conditions-preview">
                     <span 
-                      v-for="button in stage.buttons" 
-                      :key="button"
-                      class="button-preview"
+                      v-for="condition in stage.conditions" 
+                      :key="condition.type"
+                      class="condition-preview"
                     >
-                      {{ button }}
+                      {{ getConditionText(condition) }}
                     </span>
                   </div>
                 </div>
@@ -304,23 +304,7 @@
             </div>
           </div>
 
-          <!-- Buttons -->
-          <div class="form-section">
-            <h4>Кнопки</h4>
-            
-            <div class="buttons-list">
-              <div 
-                v-for="(button, index) in selectedStage.buttons" 
-                :key="index"
-                class="button-item"
-              >
-                <input v-model="selectedStage.buttons[index]" type="text" placeholder="🔍 Проверка">
-                <button @click="removeButton(index)" class="btn-remove">×</button>
-              </div>
-            </div>
-            
-            <button @click="addButton" class="btn-add">➕ Добавить кнопку</button>
-          </div>
+
 
           <!-- Conditions -->
           <div class="form-section">
@@ -362,7 +346,7 @@
                       <option value="redirect">➡️ Перейти к этапу</option>
                       <option value="skip">⏭️ Пропустить этап</option>
                       <option value="block">🚫 Заблокировать</option>
-                      <option value="show_choice">📋 Показать выбор</option>
+                      <option value="show_choice">📋 Показать кнопки</option>
                       <option value="execute_check">🔍 Выполнить проверку</option>
                     </select>
                   </div>
@@ -398,14 +382,21 @@
                   </div>
                   
                   <div class="condition-group" v-if="condition.action === 'show_choice'">
-                    <label>Показать выбор:</label>
-                    <select v-model="condition.choice_type" class="condition-select">
-                      <option value="">Выберите тип выбора</option>
-                      <option value="check_type">Тип проверки (бесплатная/платная)</option>
-                      <option value="payment_method">Способ оплаты</option>
-                      <option value="main_menu">Главное меню</option>
-                    </select>
-                    <small class="help-text">Показать пользователю выбор из нескольких опций</small>
+                    <label>Показать кнопки:</label>
+                    <div class="buttons-config">
+                      <div class="buttons-list">
+                        <div 
+                          v-for="(button, btnIndex) in condition.buttons" 
+                          :key="btnIndex"
+                          class="button-item"
+                        >
+                          <input v-model="condition.buttons[btnIndex]" type="text" placeholder="🛡️ Глубокий AI-анализ">
+                          <button @click="removeConditionButton(condition, btnIndex)" class="btn-remove">×</button>
+                        </div>
+                      </div>
+                      <button @click="addConditionButton(condition)" class="btn-add">➕ Добавить кнопку</button>
+                    </div>
+                    <small class="help-text">Настройте кнопки, которые покажутся пользователю при выполнении условия</small>
                   </div>
                   
                   <div class="condition-group" v-if="condition.action === 'execute_check'">
@@ -424,6 +415,13 @@
             <button @click="addCondition" class="btn-add">➕ Добавить условие</button>
             
             <div class="conditions-help">
+              <h5>🎯 КАК НАСТРОИТЬ КНОПКИ:</h5>
+              <div class="setup-instructions">
+                <p><strong>1️⃣ Выбери условие:</strong> "💰 Баланс >= 2.0 USDT" или "⚠️ Баланс < 2.0 USDT"</p>
+                <p><strong>2️⃣ Выбери действие:</strong> "📋 Показать кнопки" (НЕ "🔍 Выполнить проверку"!)</p>
+                <p><strong>3️⃣ Настрой кнопки:</strong> Добавь нужные кнопки через интерфейс ниже</p>
+              </div>
+              
               <h5>💡 Как работают условия:</h5>
               <ul>
                 <li><strong>💰 Баланс >= {{ getPaidCheckPrice() }} USDT:</strong> У пользователя достаточно денег → показать платные опции</li>
@@ -437,7 +435,7 @@
               <ul>
                 <li><strong>➡️ Перейти к этапу:</strong> Переключиться на другой этап сценария</li>
                 <li><strong>💬 Показать сообщение:</strong> Отправить пользователю текст</li>
-                <li><strong>📋 Показать выбор:</strong> Дать пользователю кнопки для выбора</li>
+                <li><strong>📋 Показать кнопки:</strong> Показать пользователю кнопки на основе условий</li>
                 <li><strong>🔍 Выполнить проверку:</strong> Запустить проверку адреса</li>
               </ul>
             </div>
@@ -626,7 +624,6 @@ export default {
         trigger_value: '',
         text_key: '',
         custom_text: '',
-        buttons: [],
         conditions: [],
         next_stage: ''
       }
@@ -645,22 +642,28 @@ export default {
       }
     }
 
-    const addButton = () => {
-      if (!selectedStage.value) return
-      selectedStage.value.buttons.push('')
-    }
 
-    const removeButton = (index) => {
-      if (!selectedStage.value) return
-      selectedStage.value.buttons.splice(index, 1)
-    }
 
     const addCondition = () => {
       if (!selectedStage.value) return
       selectedStage.value.conditions.push({
         type: 'user_blocked',
-        action: 'show_message'
+        action: 'show_message',
+        buttons: []
       })
+    }
+
+    const addConditionButton = (condition) => {
+      if (!condition.buttons) {
+        condition.buttons = []
+      }
+      condition.buttons.push('')
+    }
+
+    const removeConditionButton = (condition, index) => {
+      if (condition.buttons) {
+        condition.buttons.splice(index, 1)
+      }
     }
 
     const removeCondition = (index) => {
@@ -678,6 +681,28 @@ export default {
         'balance_check': 'Проверка баланса'
       }
       return triggerMap[trigger] || trigger
+    }
+
+    const getConditionText = (condition) => {
+      const typeMap = {
+        'balance_sufficient': '💰 Баланс >= 2.0 USDT',
+        'balance_insufficient': '⚠️ Баланс < 2.0 USDT',
+        'user_blocked': '👤 Пользователь заблокирован',
+        'address_valid': '✅ Адрес валиден',
+        'address_invalid': '❌ Адрес невалиден'
+      }
+      
+      const actionMap = {
+        'show_choice': '📋 Показать кнопки',
+        'show_message': '💬 Показать сообщение',
+        'redirect': '➡️ Перейти к этапу',
+        'execute_check': '🔍 Выполнить проверку'
+      }
+      
+      const type = typeMap[condition.type] || condition.type
+      const action = actionMap[condition.action] || condition.action
+      
+      return `${type} → ${action}`
     }
 
     const saveFlow = async () => {
@@ -766,11 +791,12 @@ export default {
       deleteScenario,
       addStage,
       deleteStage,
-      addButton,
-      removeButton,
+      addConditionButton,
+      removeConditionButton,
       addCondition,
       removeCondition,
       getTriggerText,
+      getConditionText,
       getSelectedTextContent,
       getStageDescription,
       getPaidCheckPrice,
@@ -995,19 +1021,37 @@ export default {
   margin-top: 8px;
 }
 
-.buttons-preview {
+.conditions-preview {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 4px;
 }
 
-.button-preview {
-  background: #e2e8f0;
-  color: #4a5568;
+.condition-preview {
+  background: #fef5e7;
+  color: #d69e2e;
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
+}
+
+.buttons-config {
+  margin-top: 8px;
+}
+
+.setup-instructions {
+  background: #f0f9ff;
+  border: 1px solid #0ea5e9;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.setup-instructions p {
+  margin: 8px 0;
+  color: #0c4a6e;
+  font-weight: 500;
 }
 
 .stage-connections {
