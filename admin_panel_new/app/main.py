@@ -67,15 +67,25 @@ app.add_middleware(
 
 logger.info("CORS middleware added")
 
-# Создаем простой auth эндпоинт
-logger.info("Creating simple auth endpoint...")
-@app.post("/api/auth/login")
-async def simple_login():
-    """Простой эндпоинт для логина"""
-    logger.info("Simple login endpoint called")
-    return {"access_token": "demo-token", "token_type": "bearer"}
+logger.info("About to create auth endpoint...")
 
-logger.info("Simple auth endpoint created")
+# Создаем простой auth эндпоинт
+try:
+    logger.info("Creating simple auth endpoint...")
+    @app.post("/api/auth/login")
+    async def simple_login():
+        """Простой эндпоинт для логина"""
+        logger.info("Simple login endpoint called")
+        return {"access_token": "demo-token", "token_type": "bearer"}
+    
+    logger.info("Simple auth endpoint created successfully")
+except Exception as e:
+    logger.error(f"Failed to create auth endpoint: {e}")
+    logger.error(f"Exception type: {type(e)}")
+    import traceback
+    logger.error(f"Traceback: {traceback.format_exc()}")
+
+logger.info("Auth setup completed")
 
 # Pydantic модели для текстов
 class BotTextCreate(BaseModel):

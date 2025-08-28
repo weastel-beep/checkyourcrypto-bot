@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Создаем экземпляр axios с базовой конфигурацией
 const apiService = axios.create({
-  baseURL: 'https://checkyourcrypto-admin-api-new-51ea71c68148.herokuapp.com',
+  baseURL: 'https://checkyourcrypto-admin-api-new-51ea71c68148.herokuapp.com/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
