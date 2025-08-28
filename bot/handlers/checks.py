@@ -326,38 +326,29 @@ class CheckHandler(BaseHandler):
             return f"🔍 Проверка адреса {address} завершена.\n\nБлокчейн: {chain}\nТип: {check_type}"
 
     async def send_check_result_with_dynamic_buttons(self, update: Update, result_text: str, check_type: str, user):
-        """Отправить результат проверки с динамическими inline кнопками"""
+        """Отправить результат проверки с динамическими кнопками управления"""
         try:
-            from .base import MessageFormatter
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            from .base import MessageFormatter, KeyboardBuilder
             from telegram.constants import ParseMode
 
             # Конвертируем в HTML
             html_text = MessageFormatter.convert_markdown_to_html_simple(result_text)
 
-            # Создаем динамические inline кнопки на основе баланса
+            # Создаем динамическую клавиатуру на основе баланса
             async with async_session_maker() as session:
                 balance = user.balance or 0.0
                 paid_check_price = await SettingService.get_paid_check_price(session)
                 
-                buttons = []
-                
                 if balance >= paid_check_price:
                     # Богатый пользователь - показываем кнопки для заказа AI анализа
-                    buttons.extend([
-                        [InlineKeyboardButton("🛡️ Глубокий AI-анализ", callback_data="deep_analysis")],
-                        [InlineKeyboardButton("📊 Показать пример", callback_data="show_example")],
-                        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
-                    ])
+                    buttons_setting = await SettingService.get_setting(session, "rich_result_buttons")
+                    button_text = buttons_setting if buttons_setting else "🛡️ Глубокий AI-анализ|📊 Показать пример|🏠 Главное меню"
                 else:
                     # Бедный пользователь - показываем кнопки для пополнения
-                    buttons.extend([
-                        [InlineKeyboardButton("📊 Показать пример", callback_data="show_example")],
-                        [InlineKeyboardButton("💰 Пополнить баланс", callback_data="top_up_balance")],
-                        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
-                    ])
-
-                keyboard = InlineKeyboardMarkup(buttons)
+                    buttons_setting = await SettingService.get_setting(session, "poor_result_buttons")
+                    button_text = buttons_setting if buttons_setting else "📊 Показать пример|💰 Пополнить баланс|🏠 Главное меню"
+                
+                keyboard = KeyboardBuilder.create_dynamic_keyboard(button_text)
 
             # Отправляем результат
             await update.message.reply_text(html_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)

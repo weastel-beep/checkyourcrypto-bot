@@ -11,7 +11,6 @@ from common.services import TextService
 from .base import BaseHandler, TriggerDetector, MessageFormatter, KeyboardBuilder
 from .scenarios import ScenarioHandler
 from .checks import CheckHandler
-from .flow_buttons import FlowButtonHandler
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,6 @@ class MainHandler(BaseHandler):
         super().__init__()
         self.scenario_handler = ScenarioHandler()
         self.check_handler = CheckHandler()
-        self.flow_button_handler = FlowButtonHandler()
 
     async def handle(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         """Обработать любое сообщение"""
@@ -45,16 +43,20 @@ class MainHandler(BaseHandler):
                 return result
 
             # Обрабатываем кнопку "Показать пример"
-            if trigger["type"] == "button" and "🔍 Показать пример" in trigger["value"]:
+            if trigger["type"] == "button" and "📊 Показать пример" in trigger["value"]:
                 return await self.handle_show_example(update, context)
 
-            # Обрабатываем кнопку "Заказать AI анализ"
-            if trigger["type"] == "button" and "🤖 Заказать AI анализ" in trigger["value"]:
-                return await self.handle_order_ai_analysis(update, context)
+            # Обрабатываем кнопку "Глубокий AI-анализ"
+            if trigger["type"] == "button" and "🛡️ Глубокий AI-анализ" in trigger["value"]:
+                return await self.handle_deep_analysis(update, context)
 
-            # Обрабатываем callback_query для новых кнопок
-            if update.callback_query:
-                return await self.handle_callback_query(update, context)
+            # Обрабатываем кнопку "Пополнить баланс"
+            if trigger["type"] == "button" and "💰 Пополнить баланс" in trigger["value"]:
+                return await self.handle_top_up_balance(update, context)
+
+            # Обрабатываем кнопку "Главное меню"
+            if trigger["type"] == "button" and "🏠 Главное меню" in trigger["value"]:
+                return await self.handle_main_menu(update, context)
 
             # Обрабатываем сценарии
             logger.info("🔍 Пробуем обработать через ScenarioHandler")
@@ -134,17 +136,10 @@ class MainHandler(BaseHandler):
                 # Конвертируем в HTML
                 html_text = MessageFormatter.convert_markdown_to_html_simple(example_text)
                 
-                # Создаем inline кнопки
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                # Создаем обычные кнопки управления
+                from .base import KeyboardBuilder
                 
-                buttons = [
-                    [InlineKeyboardButton("🛡️ Заказать AI-анализ", callback_data="order_paid_check")],
-                    [InlineKeyboardButton("💰 Пополнить баланс", callback_data="top_up_balance")],
-                    [InlineKeyboardButton("🔙 Назад", callback_data="back_to_result")],
-                    [InlineKeyboardButton("👤 Личный кабинет", callback_data="personal_cabinet")]
-                ]
-                
-                keyboard = InlineKeyboardMarkup(buttons)
+                keyboard = KeyboardBuilder.create_dynamic_keyboard("🛡️ Заказать AI-анализ|💰 Пополнить баланс|🔙 Назад|👤 Личный кабинет")
                 
                 # Отправляем пример
                 from telegram.constants import ParseMode
@@ -157,10 +152,10 @@ class MainHandler(BaseHandler):
             self.log_error(e, "показ примера", update.effective_user.id)
             return await self.handle_fallback(update, context)
 
-    async def handle_order_ai_analysis(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-        """Обработать кнопку 'Заказать AI анализ'"""
+    async def handle_deep_analysis(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+        """Обработать кнопку 'Глубокий AI-анализ'"""
         try:
-            logger.info("🤖 Обработка кнопки 'Заказать AI анализ'")
+            logger.info("🛡️ Обработка кнопки 'Глубокий AI-анализ'")
 
             async with async_session_maker() as session:
                 user_id = update.effective_user.id
@@ -181,7 +176,7 @@ class MainHandler(BaseHandler):
                 if balance >= paid_check_price:
                     # У пользователя достаточно средств
                     await update.message.reply_text(
-                        f"🤖 Заказ AI анализа оформлен!\n\n"
+                        f"🛡️ Заказ глубокого AI-анализа оформлен!\n\n"
                         f"💰 Списано: {paid_check_price} USDT\n"
                         f"💳 Остаток: {balance - paid_check_price} USDT\n\n"
                         f"📝 Отправьте адрес для глубокого AI анализа:"
@@ -206,39 +201,51 @@ class MainHandler(BaseHandler):
             self.log_error(e, "заказ AI анализа", update.effective_user.id)
             return await self.handle_fallback(update, context)
 
-    async def handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-        """Обработать callback_query для новых кнопок"""
+    async def handle_top_up_balance(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+        """Обработать кнопку 'Пополнить баланс'"""
         try:
-            callback_data = update.callback_query.data
-            logger.info(f"🔍 Обрабатываем callback_query: {callback_data}")
+            logger.info("💰 Обработка кнопки 'Пополнить баланс'")
 
-            # Обрабатываем различные callback_data
-            if callback_data == "show_example":
-                return await self.flow_button_handler.handle_example_button(update, context)
-            elif callback_data == "top_up_balance":
-                return await self.flow_button_handler.handle_payment_button(update, context)
-            elif callback_data == "back_to_result":
-                return await self.flow_button_handler.handle_back_button(update, context)
-            elif callback_data == "order_paid_check":
-                return await self.flow_button_handler.handle_order_paid_check(update, context)
-            elif callback_data == "insufficient_balance":
-                return await self.flow_button_handler.handle_insufficient_balance(update, context)
-            elif callback_data == "binance_pay":
-                return await self.flow_button_handler.handle_binance_pay(update, context)
-            elif callback_data == "crypto_wallet":
-                return await self.flow_button_handler.handle_crypto_wallet(update, context)
-            elif callback_data == "main_menu":
-                return await self.flow_button_handler.handle_main_menu(update, context)
-            elif callback_data == "personal_cabinet":
-                return await self.flow_button_handler.handle_personal_cabinet(update, context)
-            else:
-                logger.warning(f"⚠️ Неизвестный callback_data: {callback_data}")
-                await update.callback_query.answer("❌ Неизвестная команда")
-                return True
+            async with async_session_maker() as session:
+                user_id = update.effective_user.id
+                
+                # Получаем текст методов оплаты
+                text = await TextService.get_text(session, "payment_methods", "ru", user_id)
+                
+                # Заменяем плейсхолдеры
+                from common.services_package.placeholder_service import PlaceholderService
+                text = await PlaceholderService.replace_placeholders(session, text, user_id)
+                
+                # Конвертируем в HTML
+                html_text = MessageFormatter.convert_markdown_to_html_simple(text)
+
+                # Создаем кнопки
+                from .base import KeyboardBuilder
+                keyboard = KeyboardBuilder.create_dynamic_keyboard("💳 Binance Pay|🪙 Криптокошелек|🔙 Назад|🏠 Главное меню")
+
+                # Отправляем сообщение
+                from telegram.constants import ParseMode
+                await update.message.reply_text(html_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+
+            return True
 
         except Exception as e:
-            self.log_error(e, "обработка callback_query", update.effective_user.id)
-            return False
+            self.log_error(e, "пополнение баланса", update.effective_user.id)
+            return await self.handle_fallback(update, context)
+
+    async def handle_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+        """Обработать кнопку 'Главное меню'"""
+        try:
+            logger.info("🏠 Обработка кнопки 'Главное меню'")
+            
+            # Возвращаемся в главное меню
+            return await self.handle_start_command(update, context)
+
+        except Exception as e:
+            self.log_error(e, "главное меню", update.effective_user.id)
+            return await self.handle_fallback(update, context)
+
+
 
     async def handle_error(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         """Обработать ошибку"""
