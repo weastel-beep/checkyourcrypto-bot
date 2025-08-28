@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 class FlowButtonHandler(BaseHandler):
     """Обработчик кнопок Bot Flow Designer"""
 
+    async def handle(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+        """Основной метод обработки (требуется BaseHandler)"""
+        # Этот класс используется только для отдельных методов
+        return False
+
     async def handle_example_button(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         """Обработать кнопку 'Показать пример'"""
         try:
