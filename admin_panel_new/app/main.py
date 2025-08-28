@@ -199,7 +199,7 @@ async def get_texts_for_bot():
         
         cursor.execute("""
             SELECT id, category, language, content, version, created_at, updated_at
-            FROM texts
+            FROM bot_texts
             WHERE is_active = true
             ORDER BY category, language
         """)
