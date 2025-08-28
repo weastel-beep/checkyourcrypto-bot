@@ -56,6 +56,16 @@ async def health_check():
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
 
+# Создаем тестовый эндпоинт в самом начале
+logger.info("Creating test endpoint...")
+@app.get("/test")
+async def test_endpoint():
+    """Тестовый эндпоинт"""
+    logger.info("Test endpoint called")
+    return {"message": "Test endpoint works!"}
+
+logger.info("Test endpoint created")
+
 # CORS настройки
 app.add_middleware(
     CORSMiddleware,
