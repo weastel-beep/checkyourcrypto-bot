@@ -67,20 +67,33 @@ app.add_middleware(
 
 logger.info("CORS middleware added")
 
+logger.info("About to import auth router...")
+
 # Подключаем auth роутер
 try:
+    logger.info("Importing app.api.auth...")
     from app.api.auth import router as auth_router
+    logger.info("Auth router imported successfully")
+    
+    logger.info("Including auth router...")
     app.include_router(auth_router, prefix="/api")
     logger.info("Auth router included successfully")
 except Exception as e:
     logger.error(f"Failed to include auth router: {e}")
+    logger.error(f"Exception type: {type(e)}")
+    import traceback
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    
     # Создаем простой auth эндпоинт
+    logger.info("Creating fallback auth endpoint...")
     @app.post("/api/auth/login")
     async def simple_login():
         """Простой эндпоинт для логина"""
         return {"access_token": "demo-token", "token_type": "bearer"}
     
     logger.info("Simple auth endpoint created")
+
+logger.info("Auth setup completed")
 
 # Pydantic модели для текстов
 class BotTextCreate(BaseModel):
