@@ -1,0 +1,77 @@
+{
+  "name": "Check Your Crypto Bot",
+  "description": "Telegram бот для проверки криптовалютных адресов",
+  "repository": "https://github.com/weastel-beep/-heckyourcryptonew.git",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["python", "telegram", "bot", "crypto", "blockchain"],
+  "env": {
+    "BOT_TOKEN": {
+      "description": "Telegram Bot Token",
+      "required": true
+    },
+    "DATABASE_URL": {
+      "description": "PostgreSQL Database URL",
+      "required": true
+    },
+    "HEROKU_APP_NAME": {
+      "description": "Heroku App Name",
+      "required": true
+    },
+    "ENVIRONMENT": {
+      "description": "Environment (production/staging/development)",
+      "value": "production",
+      "required": false
+    },
+    "METASLEUTH_WALLET_SCREENING_KEY": {
+      "description": "MetaSleuth Wallet Screening API Key",
+      "required": true
+    },
+    "METASLEUTH_ADDRESS_LABEL_KEY": {
+      "description": "MetaSleuth Address Label API Key",
+      "required": true
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API Key",
+      "required": true
+    },
+    "BINANCE_PAY_API_KEY": {
+      "description": "Binance Pay API Key",
+      "required": false
+    },
+    "BINANCE_PAY_SECRET_KEY": {
+      "description": "Binance Pay Secret Key",
+      "required": false
+    },
+    "REDIS_URL": {
+      "description": "Redis URL for caching",
+      "required": false
+    },
+    "LOG_LEVEL": {
+      "description": "Logging level",
+      "value": "INFO",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:mini"
+    },
+    {
+      "plan": "heroku-redis:mini"
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "scripts": {
+    "postdeploy": "python -m alembic upgrade head"
+  }
+}

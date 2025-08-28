@@ -1,0 +1,293 @@
+{% extends 'panel/base.html' %}
+
+{% block title %}Управление текстами - Check Your Crypto{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.0/ace.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.0/mode-text.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.0/theme-chrome.js"></script>
+<script>
+    // Передаем данные текстов прямо в JavaScript
+    window.allTextsData = {{ all_texts_data|safe }};
+    console.log('=== ИНИЦИАЛИЗАЦИЯ ДАННЫХ ===');
+    console.log('Загруженные тексты:', window.allTextsData);
+    console.log('Тип данных:', typeof window.allTextsData);
+    console.log('Доступные категории:', Object.keys(window.allTextsData || {}));
+    console.log('Тексты welcome:', window.allTextsData?.welcome);
+    
+    // Проверяем загрузку Ace.js
+    window.addEventListener('load', function() {
+        console.log('=== ПРОВЕРКА ACE.JS ===');
+        console.log('typeof ace:', typeof ace);
+        if (typeof ace !== 'undefined') {
+            console.log('✅ Ace.js загружен успешно!');
+        } else {
+            console.log('❌ Ace.js НЕ загружен!');
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <div class="px-4 py-6 sm:px-0">
+        <!-- Header Controls -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-900">Управление текстами</h2>
+                <p class="text-sm text-gray-600 mt-2">Выберите категорию для редактирования текстов на всех языках</p>
+            </div>
+            <div class="flex space-x-4">
+                <button onclick="saveAllTexts()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                    💾 Сохранить все
+                </button>
+            </div>
+        </div>
+        
+        <!-- Text Editor -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Text Categories Sidebar -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Категории</h3>
+                    <div class="space-y-2">
+                        <button onclick="selectCategory('welcome')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="welcome">
+                            👋 Приветствие
+                        </button>
+                        <button onclick="selectCategory('main_menu')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="main_menu">
+                            📋 Главное меню
+                        </button>
+                        <button onclick="selectCategory('check')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="check">
+                            🔍 Проверка
+                        </button>
+                        <button onclick="selectCategory('check_choice')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="check_choice">
+                            🎯 Выбор проверки
+                        </button>
+                        <button onclick="selectCategory('check_result')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="check_result">
+                            📊 Результат проверки
+                        </button>
+                        <button onclick="selectCategory('payment')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="payment">
+                            💰 Платежи
+                        </button>
+                        <button onclick="selectCategory('error')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="error">
+                            ❌ Ошибки
+                        </button>
+                        <button onclick="selectCategory('help')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="help">
+                            ❓ Помощь
+                        </button>
+                        <button onclick="selectCategory('settings')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="settings">
+                            ⚙️ Настройки
+                        </button>
+                        <button onclick="selectCategory('insufficient_balance')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="insufficient_balance">
+                            💸 Недостаточно средств
+                        </button>
+                        <button onclick="selectCategory('user_blocked')" class="category-btn w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50" data-category="user_blocked">
+                            🚫 Пользователь заблокирован
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Text Editors -->
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <div id="textEditors" class="space-y-6">
+                        <!-- Russian Editor -->
+                        <div class="text-editor" data-category="welcome" data-language="ru">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="text-lg font-medium text-gray-900">🇷🇺 Русский</h4>
+                                <div class="flex space-x-2">
+                                    <button onclick="resetText('welcome', 'ru')" class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200">
+                                        Сбросить
+                                    </button>
+                                    <button onclick="saveText('welcome', 'ru')" class="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
+                                        Сохранить
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="editor-welcome-ru" class="border border-gray-300 rounded-md" style="height: 200px;"></div>
+                        </div>
+                        
+                        <!-- English Editor -->
+                        <div class="text-editor" data-category="welcome" data-language="en">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="text-lg font-medium text-gray-900">🇺🇸 English</h4>
+                                <div class="flex space-x-2">
+                                    <button onclick="resetText('welcome', 'en')" class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200">
+                                        Reset
+                                    </button>
+                                    <button onclick="saveText('welcome', 'en')" class="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="editor-welcome-en" class="border border-gray-300 rounded-md" style="height: 200px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let editors = {};
+let currentCategory = 'welcome';
+
+// Инициализация редакторов
+document.addEventListener('DOMContentLoaded', function() {
+    initializeEditors();
+    selectCategory('welcome');
+});
+
+function initializeEditors() {
+    const categories = ['welcome', 'main_menu', 'check', 'check_choice', 'check_result', 'payment', 'error', 'help', 'settings', 'insufficient_balance', 'user_blocked'];
+    const languages = ['ru', 'en'];
+    
+    categories.forEach(category => {
+        languages.forEach(language => {
+            const editorId = `editor-${category}-${language}`;
+            const editorElement = document.getElementById(editorId);
+            
+            if (editorElement) {
+                const editor = ace.edit(editorId);
+                editor.setTheme("ace/theme/chrome");
+                editor.session.setMode("ace/mode/text");
+                editor.setShowPrintMargin(false);
+                editor.setFontSize(14);
+                
+                // Устанавливаем текст из данных
+                const text = window.allTextsData[category]?.[language] || '';
+                editor.setValue(text);
+                
+                editors[editorId] = editor;
+            }
+        });
+    });
+}
+
+function selectCategory(category) {
+    currentCategory = category;
+    
+    // Обновляем активную кнопку
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-100', 'text-blue-900');
+        btn.classList.add('text-gray-600');
+    });
+    
+    const activeBtn = document.querySelector(`[data-category="${category}"]`);
+    if (activeBtn) {
+        activeBtn.classList.remove('text-gray-600');
+        activeBtn.classList.add('bg-blue-100', 'text-blue-900');
+    }
+    
+    // Показываем редакторы для выбранной категории
+    document.querySelectorAll('.text-editor').forEach(editor => {
+        if (editor.dataset.category === category) {
+            editor.style.display = 'block';
+        } else {
+            editor.style.display = 'none';
+        }
+    });
+}
+
+function saveText(category, language) {
+    const editorId = `editor-${category}-${language}`;
+    const editor = editors[editorId];
+    
+    if (editor) {
+        const text = editor.getValue();
+        
+        fetch('/api/panel/texts/save/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: JSON.stringify({
+                category: category,
+                language: language,
+                content: text
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('✅ Текст сохранен!', 'success');
+            } else {
+                showNotification('❌ Ошибка: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('❌ Ошибка сети: ' + error, 'error');
+        });
+    }
+}
+
+function saveAllTexts() {
+    const categories = ['welcome', 'main_menu', 'check', 'check_choice', 'check_result', 'payment', 'error', 'help', 'settings', 'insufficient_balance', 'user_blocked'];
+    const languages = ['ru', 'en'];
+    const texts = {};
+    
+    categories.forEach(category => {
+        texts[category] = {};
+        languages.forEach(language => {
+            const editorId = `editor-${category}-${language}`;
+            const editor = editors[editorId];
+            if (editor) {
+                texts[category][language] = editor.getValue();
+            }
+        });
+    });
+    
+    fetch('/api/panel/texts/save-all/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+        body: JSON.stringify({ texts: texts })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('✅ Все тексты сохранены!', 'success');
+        } else {
+            showNotification('❌ Ошибка: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('❌ Ошибка сети: ' + error, 'error');
+    });
+}
+
+function resetText(category, language) {
+    const editorId = `editor-${category}-${language}`;
+    const editor = editors[editorId];
+    
+    if (editor) {
+        const originalText = window.allTextsData[category]?.[language] || '';
+        editor.setValue(originalText);
+        showNotification('🔄 Текст сброшен к исходному значению', 'info');
+    }
+}
+
+function showNotification(message, type = 'info') {
+    // Создаем уведомление
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white font-medium z-50 ${
+        type === 'success' ? 'bg-green-500' :
+        type === 'error' ? 'bg-red-500' :
+        'bg-blue-500'
+    }`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // Удаляем через 3 секунды
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+</script>
+{% endblock %}

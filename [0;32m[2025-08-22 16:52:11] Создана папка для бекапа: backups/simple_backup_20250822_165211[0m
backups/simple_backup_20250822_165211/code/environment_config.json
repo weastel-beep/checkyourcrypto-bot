@@ -1,0 +1,20 @@
+{
+  "local": {
+    "description": "\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u0430\u044f \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0430",
+    "heroku_worker_scale": 0,
+    "auto_cleanup": true,
+    "telegram_cleanup": true
+  },
+  "production": {
+    "description": "\u041f\u0440\u043e\u0434\u0430\u043a\u0448\u0435\u043d \u043d\u0430 Heroku",
+    "heroku_worker_scale": 1,
+    "auto_cleanup": true,
+    "telegram_cleanup": true
+  },
+  "development": {
+    "description": "\u0420\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0430 \u0441 \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u044b\u043c \u0431\u043e\u0442\u043e\u043c",
+    "heroku_worker_scale": 0,
+    "auto_cleanup": true,
+    "telegram_cleanup": true
+  }
+}

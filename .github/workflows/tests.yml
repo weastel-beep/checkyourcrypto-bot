@@ -1,0 +1,176 @@
+name: Tests and Quality Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Create test environment file
+      run: |
+        echo "BOT_TOKEN=test_token" > .env
+        echo "ALERT_BOT_TOKEN=test_alert_token" >> .env
+        echo "OPS_CHAT_ID=123456789" >> .env
+        echo "METASLEUTH_WALLET_SCREENING_KEY=test_screening_key" >> .env
+        echo "METASLEUTH_ADDRESS_LABEL_KEY=test_label_key" >> .env
+        echo "ADMIN_SECRET=test_admin_secret" >> .env
+        echo "AWS_S3_BUCKET=test_bucket" >> .env
+        echo "AWS_ACCESS_KEY_ID=test_key" >> .env
+        echo "AWS_SECRET_ACCESS_KEY=test_secret" >> .env
+        echo "MOCK_METASLEUTH=true" >> .env
+        echo "DATABASE_URL=sqlite+aiosqlite:///:memory:" >> .env
+        echo "ENVIRONMENT=test" >> .env
+        echo "DEBUG=false" >> .env
+
+    - name: Run linting
+      run: |
+        pip install flake8 black isort mypy
+        # Check code formatting
+        black --check --diff .
+        # Check import sorting
+        isort --check-only --diff .
+        # Run flake8 linting
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run type checking
+      run: |
+        mypy --ignore-missing-imports common/ bot/
+      continue-on-error: true
+
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short --durations=10 --cov=common --cov=bot --cov-report=xml --cov-report=term
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+      continue-on-error: true
+
+    - name: Test report
+      uses: dorny/test-reporter@v1
+      if: success() || failure()
+      with:
+        name: Test Results
+        path: "*.xml"
+        reporter: java-junit
+      continue-on-error: true
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install security tools
+      run: |
+        pip install safety bandit
+
+    - name: Check for security vulnerabilities in dependencies
+      run: |
+        safety check
+      continue-on-error: true
+
+    - name: Run bandit security linter
+      run: |
+        bandit -r common/ bot/ -f json -o bandit-report.json
+      continue-on-error: true
+
+    - name: Upload bandit report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: bandit-report
+        path: bandit-report.json
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Create deployment package
+      run: |
+        # Create deployment archive
+        tar -czf checkyourcrypto-$(date +%Y%m%d-%H%M%S).tar.gz \
+          --exclude='.git' \
+          --exclude='tests' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='.pytest_cache' \
+          --exclude='venv' \
+          --exclude='.env' \
+          .
+
+    - name: Upload deployment package
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-package
+        path: "*.tar.gz"
+        retention-days: 30
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test, security, build]
+    if: always()
+
+    steps:
+    - name: Notify on success
+      if: needs.test.result == 'success' && needs.security.result == 'success'
+      run: |
+        echo "✅ All checks passed! System is ready for deployment."
+
+    - name: Notify on failure
+      if: needs.test.result == 'failure' || needs.security.result == 'failure'
+      run: |
+        echo "❌ Some checks failed. Please review the results."
+        exit 1

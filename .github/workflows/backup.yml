@@ -1,0 +1,83 @@
+name: Auto Backup
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    # Бекап каждый день в 3:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Ручной запуск
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install psycopg2-binary
+        pip install python-dotenv
+        
+    - name: Create backup
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        BACKUP_PATH: ./backups/backup_$(date +%Y%m%d_%H%M%S)
+      run: |
+        mkdir -p $BACKUP_PATH
+        
+        # Бекап кода
+        echo "📦 Создание бекапа кода..."
+        tar -czf $BACKUP_PATH/code_backup.tar.gz --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='backups' .
+        
+        # Бекап базы данных
+        echo "🗄️ Создание бекапа базы данных..."
+        pg_dump $DATABASE_URL > $BACKUP_PATH/database_backup.sql
+        
+        # Создание README с информацией о бекапе
+        cat > $BACKUP_PATH/README.md << EOF
+        # Backup $(date +%Y-%m-%d_%H:%M:%S)
+        
+        ## Содержимое:
+        - \`code_backup.tar.gz\` - Архив с кодом проекта
+        - \`database_backup.sql\` - Дамп базы данных PostgreSQL
+        
+        ## Восстановление:
+        
+        ### Код:
+        \`\`\`bash
+        tar -xzf code_backup.tar.gz
+        \`\`\`
+        
+        ### База данных:
+        \`\`\`bash
+        psql \$DATABASE_URL < database_backup.sql
+        \`\`\`
+        
+        ## Автоматический бекап:
+        Создан GitHub Actions workflow: \`.github/workflows/backup.yml\`
+        EOF
+        
+        echo "✅ Бекап создан: $BACKUP_PATH"
+        
+    - name: Upload backup as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: backup-$(date +%Y%m%d_%H%M%S)
+        path: ./backups/
+        retention-days: 30
+        
+    - name: Create backup commit
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add backups/
+        git commit -m "🤖 Auto backup $(date +%Y-%m-%d_%H:%M:%S)" || echo "No changes to commit"
+        git push || echo "Push failed (normal for scheduled runs)"

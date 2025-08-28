@@ -1,0 +1,76 @@
+{% extends 'panel/base.html' %}
+
+{% block title %}Управление пользователями - Check Your Crypto{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h2 class="text-3xl font-bold text-gray-900">Управление пользователями</h2>
+    <div class="flex space-x-4">
+        <form method="get" class="flex">
+            <input type="text" name="search" value="{{ search }}" placeholder="Поиск пользователей..." 
+                   class="px-4 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700">
+                Поиск
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- CSRF Token -->
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+<!-- Users Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telegram ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Язык</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Баланс</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата регистрации</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% if users %}
+                    {% for user in users %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ user.tg_id }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ user.username|default:"Не указан" }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ user.language }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ user.balance|floatformat:2 }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ user.created_at|date:"d.m.Y H:i" }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a href="/api/panel/users/{{ user.tg_id }}/" class="text-blue-600 hover:text-blue-900">Просмотр</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-center text-sm text-gray-500" colspan="6">
+                            Пользователей пока нет в базе данных. Возможно, бот еще не использовался или данные находятся в другой базе.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+    <div class="mt-6 flex justify-center">
+        <nav class="flex space-x-2">
+            {% for p in page_range %}
+                {% if p == page %}
+                    <span class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium bg-blue-600 text-white">{{ p }}</span>
+                {% else %}
+                    <a href="?page={{ p }}&search={{ search }}" class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white text-gray-700 hover:bg-gray-50">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+        </nav>
+    </div>
+{% endif %}
+{% endblock %}

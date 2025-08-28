@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Профиль пользователя {{ user.tg_id }} - Check Your Crypto</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-6">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">Check Your Crypto</h1>
+                        <p class="text-sm text-gray-600">Панель администратора</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="/api/panel/" class="text-sm text-blue-600 hover:text-blue-800">Дашборд</a>
+                        <a href="/api/panel/users/" class="text-sm text-blue-600 hover:text-blue-800">Пользователи</a>
+                        <span class="text-sm text-gray-600">admin</span>
+                        <a href="/api/panel/logout/" class="text-sm text-red-600 hover:text-red-800">Выйти</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div class="px-4 py-6 sm:px-0">
+                <!-- User Header -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-900">Пользователь {{ user.tg_id }}</h2>
+                            <p class="text-sm text-gray-600 mt-1">Зарегистрирован: {{ user.created_at|date:"d.m.Y H:i" }}</p>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button onclick="changeBalance({{ user.tg_id }})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                Изменить баланс
+                            </button>
+                            <button onclick="openMessageModal({{ user.tg_id }})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                Отправить сообщение
+                            </button>
+                            {% if user.is_blocked %}
+                                <button onclick="unblockUser({{ user.tg_id }})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Разблокировать</button>
+                            {% else %}
+                                <button onclick="blockUser({{ user.tg_id }})" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Заблокировать</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Basic Info -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Основная информация</h3>
+                    <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Telegram ID</dt>
+                            <dd class="text-sm text-gray-900">{{ user.tg_id }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Username</dt>
+                            <dd class="text-sm text-gray-900">{{ user.username|default:"Не указан" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Язык</dt>
+                            <dd class="text-sm text-gray-900">{{ user.language|upper }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Баланс</dt>
+                            <dd class="text-sm text-gray-900">${{ user.balance|floatformat:2 }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Статус</dt>
+                            <dd class="text-sm text-gray-900">
+                                {% if user.is_blocked %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        Заблокирован
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Активен
+                                    </span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Дата регистрации</dt>
+                            <dd class="text-sm text-gray-900">{{ user.created_at|date:"d.m.Y H:i" }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Последняя активность</dt>
+                            <dd class="text-sm text-gray-900">{{ user.updated_at|date:"d.m.Y H:i" }}</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <!-- Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 bg-blue-100 rounded-lg">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Проверок</p>
+                                <p class="text-2xl font-bold text-gray-900">{{ total_checks }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 bg-green-100 rounded-lg">
+                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Платежей</p>
+                                <p class="text-2xl font-bold text-gray-900">{{ total_payments }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 bg-yellow-100 rounded-lg">
+                                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Сообщений</p>
+                                <p class="text-2xl font-bold text-gray-900">{{ total_messages }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 bg-purple-100 rounded-lg">
+                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Действий</p>
+                                <p class="text-2xl font-bold text-gray-900">{{ total_actions }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                    <div class="border-b border-gray-200">
+                        <nav class="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+                            <button onclick="showTab('checks')" class="tab-button border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600" id="tab-checks">
+                                🔍 Проверки ({{ total_checks }})
+                            </button>
+                            <button onclick="showTab('payments')" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700" id="tab-payments">
+                                💰 Платежи ({{ total_payments }})
+                            </button>
+                            <button onclick="showTab('messages')" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700" id="tab-messages">
+                                📨 Сообщения ({{ total_messages }})
+                            </button>
+                            <button onclick="showTab('actions')" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700" id="tab-actions">
+                                📋 Действия ({{ total_actions }})
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div class="p-6">
+                        <!-- Checks Tab -->
+                        <div id="tab-content-checks" class="tab-content">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Адрес</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Тип</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Риск</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Счет</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        {% for check in checks %}
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-4 text-sm text-gray-900 font-mono">
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="text-xs text-gray-400">{{ check.chain|upper }}</span>
+                                                    <span>{{ check.address|truncatechars:25 }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 text-sm text-gray-900">
+                                                <div class="flex items-center space-x-1">
+                                                    <span>{% if check.type == 'FREE' %}🆓{% else %}💰{% endif %}</span>
+                                                    <span>{% if check.type == 'FREE' %}Базовая{% else %}Глубокий AI{% endif %}</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 text-sm text-gray-600">
+                                                Не определен
+                                            </td>
+                                            <td class="px-4 py-4 text-sm text-gray-600">
+                                                N/A
+                                            </td>
+                                            <td class="px-4 py-4 text-sm text-gray-500">
+                                                {{ check.created_at|date:"d.m.Y H:i" }}
+                                            </td>
+                                            <td class="px-4 py-4 text-sm text-gray-500">
+                                                <button onclick="viewCheckDetails({{ check.id }})" class="text-blue-600 hover:text-blue-800 text-xs">
+                                                    Детали
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="px-4 py-4 text-center text-gray-500">Нет проверок</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Payments Tab -->
+                        <div id="tab-content-payments" class="tab-content hidden">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сумма</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        {% for payment in payments %}
+                                        <tr>
+                                            <td class="px-4 py-4 text-sm text-gray-900">{{ payment.id }}</td>
+                                            <td class="px-4 py-4 text-sm text-gray-900">${{ payment.amount }}</td>
+                                            <td class="px-4 py-4 text-sm {% if payment.status == 'completed' %}text-green-600{% elif payment.status == 'pending' %}text-yellow-600{% elif payment.status == 'failed' %}text-red-600{% else %}text-gray-600{% endif %}">{{ payment.status }}</td>
+                                            <td class="px-4 py-4 text-sm text-gray-500">{{ payment.created_at|date:"d.m.Y H:i" }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-4 text-center text-gray-500">Нет платежей</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Messages Tab -->
+                        <div id="tab-content-messages" class="tab-content hidden">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Тема</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Контент</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        {% for message in messages %}
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-4 text-sm text-gray-900">
+                                                <div class="flex items-center space-x-2">
+                                                    <span>📨</span>
+                                                    <span>{{ message.subject|default:"Без темы" }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 text-sm text-gray-900">
+                                                <div class="max-w-xs truncate" title="{{ message.content }}">
+                                                    {{ message.content|truncatechars:60 }}
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 text-sm {% if message.status == 'delivered' or message.status == 'read' %}text-green-600{% elif message.status == 'sent' %}text-blue-600{% elif message.status == 'pending' %}text-yellow-600{% elif message.status == 'failed' %}text-red-600{% else %}text-gray-600{% endif %} font-medium">
+                                                {{ message.get_status_display }}
+                                            </td>
+                                            <td class="px-4 py-4 text-sm text-gray-500">
+                                                {{ message.created_at|date:"d.m.Y H:i" }}
+                                            </td>
+                                            <td class="px-4 py-4 text-sm text-gray-500">
+                                                <button onclick="viewMessageDetails({{ message.id }})" class="text-blue-600 hover:text-blue-800 text-xs">
+                                                    Детали
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="5" class="px-4 py-4 text-center text-gray-500">Нет сообщений</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Actions Tab -->
+                        <div id="tab-content-actions" class="tab-content hidden">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Администратор</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действие</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Описание</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        {% for action in admin_actions %}
+                                        <tr>
+                                            <td class="px-4 py-4 text-sm text-gray-900">{{ action.admin.username }}</td>
+                                            <td class="px-4 py-4 text-sm text-gray-900">{{ action.get_action_type_display }}</td>
+                                            <td class="px-4 py-4 text-sm text-gray-900">{{ action.description }}</td>
+                                            <td class="px-4 py-4 text-sm text-gray-500">{{ action.created_at|date:"d.m.Y H:i" }}</td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-4 text-center text-gray-500">Нет действий</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Скрываем все табы
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // Убираем активный класс у всех кнопок
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('border-blue-500', 'text-blue-600');
+                button.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // Показываем нужный таб
+            document.getElementById('tab-content-' + tabName).classList.remove('hidden');
+            
+            // Активируем нужную кнопку
+            document.getElementById('tab-' + tabName).classList.remove('border-transparent', 'text-gray-500');
+            document.getElementById('tab-' + tabName).classList.add('border-blue-500', 'text-blue-600');
+        }
+
+        function changeBalance(userId) {
+            const amount = prompt('Введите сумму для изменения баланса (положительная - пополнение, отрицательная - списание):');
+            if (amount === null) return;
+            
+            fetch(`/api/panel/users/${userId}/balance/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ amount: parseFloat(amount) })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Баланс изменен успешно!');
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Ошибка сети: ' + error);
+            });
+        }
+
+        function blockUser(userId) {
+            if (confirm('Заблокировать пользователя?')) {
+                fetch(`/api/panel/users/${userId}/block/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Пользователь заблокирован!');
+                        location.reload();
+                    } else {
+                        alert('Ошибка: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    alert('Ошибка сети: ' + error);
+                });
+            }
+        }
+
+        function unblockUser(userId) {
+            if (confirm('Разблокировать пользователя?')) {
+                fetch(`/api/panel/users/${userId}/unblock/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Пользователь разблокирован!');
+                        location.reload();
+                    } else {
+                        alert('Ошибка: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    alert('Ошибка сети: ' + error);
+                });
+            }
+        }
+
+        function openMessageModal(userId) {
+            const message = prompt('Введите сообщение для пользователя:');
+            if (message === null || message.trim() === '') return;
+            
+            fetch(`/api/panel/users/${userId}/message/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Сообщение отправлено!');
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Ошибка сети: ' + error);
+            });
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function viewCheckDetails(checkId) {
+            alert('Детали проверки ' + checkId + ' (функция в разработке)');
+        }
+
+        function viewMessageDetails(messageId) {
+            alert('Детали сообщения ' + messageId + ' (функция в разработке)');
+        }
+    </script>
+</body>
+</html>

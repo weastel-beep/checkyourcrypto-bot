@@ -1,0 +1,514 @@
+{% extends 'panel/base.html' %}
+
+{% block title %}Массовые сообщения - Check Your Crypto{% endblock %}
+
+{% block extra_head %}
+<meta name="csrf-token" content="{{ csrf_token }}">
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div class="px-4 py-6 sm:px-0">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-3xl font-bold text-gray-900">Массовые сообщения</h2>
+                    <div class="flex space-x-2">
+                        <button onclick="testButton()" class="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+                            🧪 Тест JS
+                        </button>
+                        <button onclick="showCreateForm()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            Создать сообщение
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 bg-blue-100 rounded-lg">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Всего сообщений</p>
+                                <p class="text-2xl font-bold text-gray-900">{{ total_messages }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 bg-green-100 rounded-lg">
+                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Отправлено</p>
+                                <p class="text-2xl font-bold text-gray-900">{{ sent_messages }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 bg-yellow-100 rounded-lg">
+                                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Запланировано</p>
+                                <p class="text-2xl font-bold text-gray-900">{{ scheduled_messages }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Messages Table -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Тема</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Фильтр</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Статус</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата отправки</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for message in messages %}
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ message.id }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-900">{{ message.title }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-900">{{ message.user_filter }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                            {% if message.status == 'COMPLETED' %}bg-green-100 text-green-800
+                                            {% elif message.status == 'SENDING' %}bg-yellow-100 text-yellow-800
+                                            {% elif message.status == 'FAILED' %}bg-red-100 text-red-800
+                                            {% elif message.status == 'SCHEDULED' %}bg-blue-100 text-blue-800
+                                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                            {{ message.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {{ message.created_at|date:"d.m.Y H:i" }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <div class="flex flex-col space-y-1">
+                                            <button onclick="sendMessage({{ message.id }})" class="btn text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                                📤 Отправить
+                                            </button>
+                                            <button onclick="startMassSend({{ message.id }})" class="btn text-xs px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">
+                                                🚀 Новая рассылка
+                                            </button>
+                                            <button onclick="editMessage({{ message.id }})" class="btn text-xs px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700">
+                                                ✏️ Редактировать
+                                            </button>
+                                            <button onclick="deleteMessage({{ message.id }})" class="btn text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700">
+                                                🗑️ Удалить
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                        Нет сообщений
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Create Message Modal -->
+        <div id="createModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Создать новое сообщение</h3>
+                <form id="createForm">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Тема сообщения</label>
+                        <input type="text" name="title" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Текст сообщения</label>
+                        <textarea name="content" rows="4" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Фильтр пользователей</label>
+                        <select name="user_filter" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Выберите фильтр</option>
+                            <option value="all">Все пользователи</option>
+                            <option value="active">Активные (за неделю)</option>
+                            <option value="new">Новые (за неделю)</option>
+                            <option value="balance">По балансу</option>
+                            <option value="language">По языку</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Тип отправки</label>
+                        <select name="send_type" onchange="toggleScheduleField()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="immediate">Отправить сейчас</option>
+                            <option value="scheduled">Запланировать</option>
+                        </select>
+                    </div>
+                    <div id="scheduleField" class="mb-4 hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Дата и время отправки</label>
+                        <input type="datetime-local" name="scheduled_at" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="hideCreateForm()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                            Отмена
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            Создать
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Message Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Редактировать сообщение</h3>
+                <form id="editForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="message_id" id="editMessageId">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Тема сообщения</label>
+                        <input type="text" name="title" id="editTitle" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Текст сообщения</label>
+                        <textarea name="content" id="editContent" rows="4" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Фильтр пользователей</label>
+                        <select name="user_filter" id="editUserFilter" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Выберите фильтр</option>
+                            <option value="all">Все пользователи</option>
+                            <option value="active">Активные (за неделю)</option>
+                            <option value="new">Новые (за неделю)</option>
+                            <option value="balance">По балансу</option>
+                            <option value="language">По языку</option>
+                        </select>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="hideEditForm()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                            Отмена
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
+                            Сохранить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .notification.success { background-color: #10b981; }
+        .notification.error { background-color: #ef4444; }
+        .notification.info { background-color: #3b82f6; }
+        
+        .btn {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            font-weight: 500;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+
+    <script>
+        // Глобальные функции
+        window.showNotification = function(message, type = 'info') {
+            const existingNotifications = document.querySelectorAll('.notification');
+            existingNotifications.forEach(n => n.remove());
+            
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 5000);
+        }
+        
+        window.testButton = function() {
+            console.log('🧪 Тестовая кнопка работает!');
+            window.showNotification('🧪 JavaScript работает!', 'success');
+        };
+        
+        window.showCreateForm = function() {
+            document.getElementById('createModal').classList.remove('hidden');
+        };
+        
+        window.hideCreateForm = function() {
+            document.getElementById('createModal').classList.add('hidden');
+        };
+        
+        window.toggleScheduleField = function() {
+            const sendType = document.querySelector('select[name="send_type"]').value;
+            const scheduleField = document.getElementById('scheduleField');
+            if (sendType === 'scheduled') {
+                scheduleField.classList.remove('hidden');
+            } else {
+                scheduleField.classList.add('hidden');
+            }
+        };
+        
+        window.editMessage = function(id) {
+            console.log('✏️ Вызываем editMessage для ID:', id);
+            
+            // Получаем данные сообщения для заполнения формы
+            fetch(`/api/panel/messages/${id}/get/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Заполняем форму данными
+                    document.getElementById('editMessageId').value = id;
+                    document.getElementById('editTitle').value = data.message.title;
+                    document.getElementById('editContent').value = data.message.content;
+                    document.getElementById('editUserFilter').value = data.message.user_filter || 'all';
+                    
+                    // Показываем модальное окно
+                    document.getElementById('editModal').classList.remove('hidden');
+                } else {
+                    window.showNotification('❌ Ошибка загрузки данных: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка загрузки данных:', error);
+                window.showNotification('❌ Ошибка загрузки данных: ' + error.message, 'error');
+            });
+        };
+        
+        window.hideEditForm = function() {
+            document.getElementById('editModal').classList.add('hidden');
+        };
+        
+        window.deleteMessage = function(id) {
+            console.log('🗑️ Вызываем deleteMessage для ID:', id);
+            if (confirm('🗑️ Вы уверены, что хотите удалить это сообщение?\n\nЭто действие нельзя отменить.')) {
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+                
+                fetch(`/api/panel/messages/${id}/delete/`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    console.log('Ответ сервера удаления:', response.status, response.statusText);
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        throw new Error('Сервер вернул ошибку: ' + response.status);
+                    }
+                })
+                .then(data => {
+                    if (data.success) {
+                        window.showNotification('✅ Сообщение удалено успешно!', 'success');
+                        location.reload();
+                    } else {
+                        window.showNotification('❌ Ошибка: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка удаления:', error);
+                    window.showNotification('❌ Ошибка: ' + error.message, 'error');
+                });
+            }
+        };
+        
+        window.sendMessage = function(id) {
+            console.log('📤 Вызываем sendMessage для ID:', id);
+            if (confirm('📤 Отправить это сообщение всем пользователям?')) {
+                const formData = new FormData();
+                formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+                
+                fetch(`/api/panel/messages/${id}/send/`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    console.log('Ответ сервера отправки:', response.status, response.statusText);
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        throw new Error('Сервер вернул ошибку: ' + response.status);
+                    }
+                })
+                .then(data => {
+                    if (data.success) {
+                        window.showNotification('✅ Отправка запущена!', 'success');
+                        location.reload();
+                    } else {
+                        window.showNotification('❌ Ошибка: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка отправки:', error);
+                    window.showNotification('❌ Ошибка: ' + error.message, 'error');
+                });
+            }
+        };
+        
+        // Обработчик создания сообщения
+        document.getElementById('createForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalText = submitButton.textContent;
+            
+            submitButton.textContent = 'Создание...';
+            submitButton.disabled = true;
+            
+            fetch('/api/panel/messages/create/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.showNotification('✅ Сообщение создано успешно!', 'success');
+                    location.reload();
+                } else {
+                    window.showNotification('❌ Ошибка: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка запроса:', error);
+                window.showNotification('❌ Ошибка: ' + error.message, 'error');
+            })
+            .finally(() => {
+                submitButton.textContent = originalText;
+                submitButton.disabled = false;
+            });
+        });
+        
+        // Функция запуска новой массовой рассылки
+        window.startMassSend = function(id) {
+            if (confirm('Запустить новую систему массовой рассылки для сообщения ' + id + '?')) {
+                const formData = new FormData();
+                formData.append('user_filter', 'all');
+                formData.append('batch_size', '10');
+                formData.append('delay_between_batches', '1');
+                formData.append('delay_between_messages', '0.1');
+                
+                fetch(`/api/panel/messages/${id}/start-mass-send/`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    console.log('Ответ сервера новой рассылки:', response.status, response.statusText);
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        throw new Error('Сервер вернул ошибку: ' + response.status);
+                    }
+                })
+                .then(data => {
+                    if (data.success) {
+                        window.showNotification('✅ Новая рассылка запущена! Сессия ID: ' + data.session_id, 'success');
+                        // Можно добавить ссылку на мониторинг
+                        if (confirm('Хотите открыть страницу мониторинга рассылки?')) {
+                            window.open(`/api/panel/mass-send/sessions/${data.session_id}/status/`, '_blank');
+                        }
+                    } else {
+                        window.showNotification('❌ Ошибка: ' + data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка запуска новой рассылки:', error);
+                    window.showNotification('❌ Ошибка: ' + error.message, 'error');
+                });
+            }
+        };
+        
+        // Обработчик редактирования сообщения
+        document.getElementById('editForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const messageId = formData.get('message_id');
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalText = submitButton.textContent;
+            
+            submitButton.textContent = 'Сохранение...';
+            submitButton.disabled = true;
+            
+            fetch(`/api/panel/messages/${messageId}/edit/`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.showNotification('✅ Сообщение обновлено успешно!', 'success');
+                    hideEditForm();
+                    location.reload();
+                } else {
+                    window.showNotification('❌ Ошибка: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка редактирования:', error);
+                window.showNotification('❌ Ошибка: ' + error.message, 'error');
+            })
+            .finally(() => {
+                submitButton.textContent = originalText;
+                submitButton.disabled = false;
+            });
+        });
+    </script>
+    {% endblock %}
