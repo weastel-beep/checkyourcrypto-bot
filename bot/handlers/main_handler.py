@@ -11,6 +11,7 @@ from common.services import TextService
 from .base import BaseHandler, TriggerDetector, MessageFormatter, KeyboardBuilder
 from .scenarios import ScenarioHandler
 from .checks import CheckHandler
+from .flow_buttons import FlowButtonHandler
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class MainHandler(BaseHandler):
         super().__init__()
         self.scenario_handler = ScenarioHandler()
         self.check_handler = CheckHandler()
+        self.flow_button_handler = FlowButtonHandler()
 
     async def handle(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         """Обработать любое сообщение"""
@@ -49,6 +51,10 @@ class MainHandler(BaseHandler):
             # Обрабатываем кнопку "Заказать AI анализ"
             if trigger["type"] == "button" and "🤖 Заказать AI анализ" in trigger["value"]:
                 return await self.handle_order_ai_analysis(update, context)
+
+            # Обрабатываем callback_query для новых кнопок
+            if update.callback_query:
+                return await self.handle_callback_query(update, context)
 
             # Обрабатываем сценарии
             logger.info("🔍 Пробуем обработать через ScenarioHandler")
@@ -196,6 +202,40 @@ class MainHandler(BaseHandler):
         except Exception as e:
             self.log_error(e, "заказ AI анализа", update.effective_user.id)
             return await self.handle_fallback(update, context)
+
+    async def handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+        """Обработать callback_query для новых кнопок"""
+        try:
+            callback_data = update.callback_query.data
+            logger.info(f"🔍 Обрабатываем callback_query: {callback_data}")
+
+            # Обрабатываем различные callback_data
+            if callback_data == "show_example":
+                return await self.flow_button_handler.handle_example_button(update, context)
+            elif callback_data == "top_up_balance":
+                return await self.flow_button_handler.handle_payment_button(update, context)
+            elif callback_data == "back_to_result":
+                return await self.flow_button_handler.handle_back_button(update, context)
+            elif callback_data == "order_paid_check":
+                return await self.flow_button_handler.handle_order_paid_check(update, context)
+            elif callback_data == "insufficient_balance":
+                return await self.flow_button_handler.handle_insufficient_balance(update, context)
+            elif callback_data == "binance_pay":
+                return await self.flow_button_handler.handle_binance_pay(update, context)
+            elif callback_data == "crypto_wallet":
+                return await self.flow_button_handler.handle_crypto_wallet(update, context)
+            elif callback_data == "main_menu":
+                return await self.flow_button_handler.handle_main_menu(update, context)
+            elif callback_data == "personal_cabinet":
+                return await self.flow_button_handler.handle_personal_cabinet(update, context)
+            else:
+                logger.warning(f"⚠️ Неизвестный callback_data: {callback_data}")
+                await update.callback_query.answer("❌ Неизвестная команда")
+                return True
+
+        except Exception as e:
+            self.log_error(e, "обработка callback_query", update.effective_user.id)
+            return False
 
     async def handle_error(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         """Обработать ошибку"""
