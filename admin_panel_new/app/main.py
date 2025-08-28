@@ -25,3 +25,4 @@ async def login():
     return {"access_token": "demo-token", "token_type": "bearer"}
 
 logger.info("=== MINIMAL TEST APP READY ===")
+# Force deploy
