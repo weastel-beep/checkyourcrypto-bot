@@ -32,3 +32,8 @@ redis>=5.0.0
 # HTTP Client для интеграций
 aiohttp==3.9.1
 httpx==0.26.0
+
+# Authentication & Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
