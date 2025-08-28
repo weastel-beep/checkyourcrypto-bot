@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import psycopg2
@@ -10,27 +10,86 @@ import json
 import logging
 import sys
 import time
+import uuid
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+# Импортируем улучшенную систему логирования
+from core.logging import (
+    logger, 
+    RequestLogger, 
+    log_performance, 
+    log_database_operation,
+    log_api_call,
+    log_user_action,
+    log_security_event
 )
-logger = logging.getLogger(__name__)
 
 # Логируем запуск приложения
-logger.info("=== NEW CLEAN API STARTUP ===")
-logger.info(f"Python version: {sys.version}")
-logger.info(f"Current working directory: {os.getcwd()}")
+logger.info("=== NEW CLEAN API STARTUP ===", extra={
+    'python_version': sys.version,
+    'working_directory': os.getcwd(),
+    'environment': os.getenv('ENVIRONMENT', 'development')
+})
 
 app = FastAPI(title="CheckYourCrypto Admin API - NEW CLEAN VERSION")
 
 logger.info("FastAPI app created")
 
+# Middleware для логирования всех запросов
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Middleware для логирования всех HTTP запросов"""
+    start_time = time.time()
+    request_id = str(uuid.uuid4())
+    
+    # Создаем логгер для запроса
+    request_logger = RequestLogger(request_id)
+    
+    # Получаем IP адрес
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Логируем начало запроса
+    request_logger.log_request_start(
+        method=request.method,
+        url=str(request.url),
+        user_id=request.headers.get('X-User-ID')
+    )
+    
+    try:
+        # Выполняем запрос
+        response = await call_next(request)
+        
+        # Вычисляем время выполнения
+        duration = time.time() - start_time
+        
+        # Логируем завершение запроса
+        request_logger.log_request_end(response.status_code, duration)
+        
+        # Логируем API вызов
+        log_api_call(
+            endpoint=str(request.url.path),
+            method=request.method,
+            status_code=response.status_code,
+            duration=duration,
+            user_id=request.headers.get('X-User-ID')
+        )
+        
+        return response
+        
+    except Exception as e:
+        # Вычисляем время выполнения до ошибки
+        duration = time.time() - start_time
+        
+        # Логируем ошибку
+        request_logger.log_error(e, {
+            'client_ip': client_ip,
+            'user_agent': request.headers.get('User-Agent'),
+            'duration': f"{duration:.3f}s"
+        })
+        
+        raise
+
 @app.get("/health")
+@log_performance
 async def health_check():
     """Health check endpoint"""
     logger.info("Health check endpoint called")
@@ -41,20 +100,138 @@ async def health_check():
             if database_url.startswith('postgres://'):
                 database_url = database_url.replace('postgres://', 'postgresql://', 1)
             
+            start_time = time.time()
             conn = psycopg2.connect(database_url)
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
             cursor.fetchone()
             cursor.close()
             conn.close()
-            logger.info("Database connection: OK")
+            db_duration = time.time() - start_time
+            
+            log_database_operation("health_check", duration=db_duration)
+            logger.info("Database connection: OK", extra={'duration': f"{db_duration:.3f}s"})
         else:
             logger.warning("DATABASE_URL not set")
         
         return {"status": "ok", "timestamp": datetime.now().isoformat()}
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error(f"Health check failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+
+@app.get("/health/detailed")
+@log_performance
+async def detailed_health_check():
+    """Детальная проверка здоровья системы"""
+    health_status = {
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0",
+        "environment": os.getenv('ENVIRONMENT', 'development'),
+        "components": {}
+    }
+    
+    # Проверка базы данных
+    try:
+        database_url = os.getenv('DATABASE_URL')
+        if database_url:
+            if database_url.startswith('postgres://'):
+                database_url = database_url.replace('postgres://', 'postgresql://', 1)
+            
+            start_time = time.time()
+            conn = psycopg2.connect(database_url)
+            cursor = conn.cursor()
+            
+            # Проверяем основные таблицы
+            cursor.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name IN ('users', 'scenarios', 'bot_texts')
+                ORDER BY table_name
+            """)
+            tables = [row[0] for row in cursor.fetchall()]
+            
+            # Проверяем количество записей в основных таблицах
+            stats = {}
+            for table in tables:
+                cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                count = cursor.fetchone()[0]
+                stats[table] = count
+            
+            cursor.close()
+            conn.close()
+            db_duration = time.time() - start_time
+            
+            health_status["components"]["database"] = {
+                "status": "ok",
+                "response_time": f"{db_duration:.3f}s",
+                "tables": tables,
+                "stats": stats
+            }
+            logger.info("Database health check: OK", extra={
+                'duration': f"{db_duration:.3f}s",
+                'tables': tables,
+                'stats': stats
+            })
+        else:
+            health_status["components"]["database"] = {
+                "status": "error",
+                "error": "DATABASE_URL not set"
+            }
+            logger.warning("DATABASE_URL not set")
+            health_status["status"] = "error"
+    except Exception as e:
+        health_status["components"]["database"] = {
+            "status": "error",
+            "error": str(e)
+        }
+        logger.error(f"Database health check failed: {e}", exc_info=True)
+        health_status["status"] = "error"
+    
+    # Проверка переменных окружения
+    required_env_vars = ['DATABASE_URL']
+    env_status = {}
+    for var in required_env_vars:
+        env_status[var] = "set" if os.getenv(var) else "missing"
+    
+    health_status["components"]["environment"] = {
+        "status": "ok" if all(env_status[var] == "set" for var in required_env_vars) else "warning",
+        "variables": env_status
+    }
+    
+    # Проверка памяти
+    try:
+        import psutil
+        memory = psutil.virtual_memory()
+        health_status["components"]["memory"] = {
+            "status": "ok" if memory.percent < 80 else "warning",
+            "total": f"{memory.total / (1024**3):.1f}GB",
+            "available": f"{memory.available / (1024**3):.1f}GB",
+            "percent": f"{memory.percent:.1f}%"
+        }
+    except ImportError:
+        health_status["components"]["memory"] = {
+            "status": "unknown",
+            "error": "psutil not available"
+        }
+    
+    # Проверка диска
+    try:
+        disk = psutil.disk_usage('/')
+        health_status["components"]["disk"] = {
+            "status": "ok" if disk.percent < 90 else "warning",
+            "total": f"{disk.total / (1024**3):.1f}GB",
+            "free": f"{disk.free / (1024**3):.1f}GB",
+            "percent": f"{disk.percent:.1f}%"
+        }
+    except:
+        health_status["components"]["disk"] = {
+            "status": "unknown",
+            "error": "Unable to check disk usage"
+        }
+    
+    return health_status
 
 # Создаем тестовый эндпоинт в самом начале
 logger.info("Creating test endpoint...")
@@ -62,9 +239,15 @@ logger.info("Creating test endpoint...")
 async def test_endpoint():
     """Тестовый эндпоинт"""
     logger.info("Test endpoint called")
-    return {"message": "Test endpoint works!"}
+    return {"message": "Test endpoint works!", "timestamp": datetime.now().isoformat()}
 
-logger.info("Test endpoint created")
+@app.get("/api/test")
+async def api_test_endpoint():
+    """Тестовый API эндпоинт"""
+    logger.info("API test endpoint called")
+    return {"message": "API test endpoint works!", "timestamp": datetime.now().isoformat()}
+
+logger.info("Test endpoints created")
 
 # CORS настройки
 app.add_middleware(
@@ -80,21 +263,16 @@ logger.info("CORS middleware added")
 logger.info("About to create auth endpoint...")
 
 # Создаем простой auth эндпоинт
-try:
-    logger.info("Creating simple auth endpoint...")
-    @app.post("/api/auth/login")
-    async def simple_login():
-        """Простой эндпоинт для логина"""
-        logger.info("Simple login endpoint called")
-        return {"access_token": "demo-token", "token_type": "bearer"}
-    
-    logger.info("Simple auth endpoint created successfully")
-except Exception as e:
-    logger.error(f"Failed to create auth endpoint: {e}")
-    logger.error(f"Exception type: {type(e)}")
-    import traceback
-    logger.error(f"Traceback: {traceback.format_exc()}")
+logger.info("Creating simple auth endpoint...")
 
+@app.post("/api/auth/login")
+@log_performance
+async def simple_login():
+    """Простой эндпоинт для логина"""
+    logger.info("Simple login endpoint called")
+    return {"access_token": "demo-token", "token_type": "bearer"}
+
+logger.info("Simple auth endpoint created successfully")
 logger.info("Auth setup completed")
 
 # Pydantic модели для текстов
@@ -131,6 +309,7 @@ async def get_texts():
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -154,12 +333,14 @@ async def get_texts():
         
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_texts", duration=db_duration)
         
         logger.info(f"Returning {len(texts)} texts from database")
         return {"texts": texts, "count": len(texts)}
         
     except Exception as e:
-        logger.error(f"Error getting texts: {e}")
+        logger.error(f"Error getting texts: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting texts: {str(e)}")
 
 @app.get("/api/texts/{category}")
@@ -170,6 +351,7 @@ async def get_texts_by_category(category: str):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -194,11 +376,13 @@ async def get_texts_by_category(category: str):
         
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_texts_by_category", duration=db_duration)
         
         return {"texts": texts, "count": len(texts)}
         
     except Exception as e:
-        logger.error(f"Error getting texts by category: {e}")
+        logger.error(f"Error getting texts by category: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting texts by category: {str(e)}")
 
 @app.post("/api/texts")
@@ -209,6 +393,7 @@ async def create_text(text_data: BotTextCreate):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -222,11 +407,13 @@ async def create_text(text_data: BotTextCreate):
         conn.commit()
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("create_text", duration=db_duration)
         
         return {"id": text_id, "message": "Text created successfully"}
         
     except Exception as e:
-        logger.error(f"Error creating text: {e}")
+        logger.error(f"Error creating text: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error creating text: {str(e)}")
 
 @app.put("/api/texts/{text_id}")
@@ -238,6 +425,7 @@ async def update_text(text_id: int, text_data: BotTextUpdate):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -255,12 +443,14 @@ async def update_text(text_id: int, text_data: BotTextUpdate):
         conn.commit()
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("update_text", duration=db_duration)
         
         logger.info(f"Text {text_id} updated successfully")
         return {"message": "Text updated successfully"}
         
     except Exception as e:
-        logger.error(f"Error updating text: {e}")
+        logger.error(f"Error updating text: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error updating text: {str(e)}")
 
 @app.delete("/api/texts/{text_id}")
@@ -271,6 +461,7 @@ async def delete_text(text_id: int):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -284,11 +475,13 @@ async def delete_text(text_id: int):
         conn.commit()
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("delete_text", duration=db_duration)
         
         return {"message": "Text deleted successfully"}
         
     except Exception as e:
-        logger.error(f"Error deleting text: {e}")
+        logger.error(f"Error deleting text: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error deleting text: {str(e)}")
 
 # API endpoints для сценариев
@@ -301,6 +494,7 @@ async def get_scenarios():
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -330,6 +524,8 @@ async def get_scenarios():
             """)
             conn.commit()
             logger.info("Table 'scenarios' created")
+        db_duration = time.time() - start_time
+        log_database_operation("get_scenarios", duration=db_duration)
         
         cursor.execute("""
             SELECT id, name, description, is_active, stages, created_at, updated_at
@@ -355,7 +551,7 @@ async def get_scenarios():
         return {"scenarios": scenarios, "count": len(scenarios)}
         
     except Exception as e:
-        logger.error(f"Error getting scenarios: {e}")
+        logger.error(f"Error getting scenarios: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting scenarios: {str(e)}")
 
 @app.get("/api/scenarios/active/default")
@@ -367,6 +563,7 @@ async def get_active_scenario():
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -427,6 +624,8 @@ async def get_active_scenario():
             
             conn.commit()
             logger.info("Default scenario created")
+        db_duration = time.time() - start_time
+        log_database_operation("get_active_scenario", duration=db_duration)
         
         # Получаем активный сценарий
         cursor.execute("""
@@ -481,7 +680,7 @@ async def get_active_scenario():
         return scenario
         
     except Exception as e:
-        logger.error(f"Error getting active scenario: {e}")
+        logger.error(f"Error getting active scenario: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting active scenario: {str(e)}")
 
 @app.post("/api/scenarios")
@@ -493,6 +692,7 @@ async def create_scenario(scenario_data: ScenarioCreate):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -520,6 +720,8 @@ async def create_scenario(scenario_data: ScenarioCreate):
                 );
             """)
             conn.commit()
+        db_duration = time.time() - start_time
+        log_database_operation("create_scenario", duration=db_duration)
         
         cursor.execute("""
             INSERT INTO scenarios (id, name, description, is_active, stages, created_at, updated_at)
@@ -536,7 +738,7 @@ async def create_scenario(scenario_data: ScenarioCreate):
         return {"id": scenario_id, "message": "Scenario created successfully"}
         
     except Exception as e:
-        logger.error(f"Error creating scenario: {e}")
+        logger.error(f"Error creating scenario: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error creating scenario: {str(e)}")
 
 # API endpoints для Flow Designer (старые эндпоинты для совместимости)
@@ -550,6 +752,7 @@ async def get_bot_flow_scenarios():
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -583,11 +786,13 @@ async def get_bot_flow_scenarios():
         
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_bot_flow_scenarios", duration=db_duration)
         
         logger.info(f"Returning {len(scenarios)} scenarios from database")
         return scenarios  # Возвращаем массив напрямую
     except Exception as e:
-        logger.error(f"Error getting scenarios: {e}")
+        logger.error(f"Error getting scenarios: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting scenarios: {str(e)}")
 
 @app.get("/api/bot-flow/scenarios/{scenario_id}")
@@ -599,6 +804,7 @@ async def get_scenario(scenario_id: int):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -634,10 +840,12 @@ async def get_scenario(scenario_id: int):
         
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_scenario", duration=db_duration)
         
         return scenario
     except Exception as e:
-        logger.error(f"Error getting scenario: {e}")
+        logger.error(f"Error getting scenario: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting scenario: {str(e)}")
 
 @app.get("/api/bot-flow/texts")
@@ -649,6 +857,7 @@ async def get_texts_for_flow():
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -676,12 +885,14 @@ async def get_texts_for_flow():
         
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_texts_for_flow", duration=db_duration)
         
         logger.info(f"Returning {len(texts)} texts for Flow Designer")
         return texts  # Возвращаем массив напрямую
         
     except Exception as e:
-        logger.error(f"Error getting texts for flow: {e}")
+        logger.error(f"Error getting texts for flow: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting texts for flow: {str(e)}")
 
 @app.post("/api/bot-flow/recreate-table")
@@ -692,6 +903,7 @@ async def recreate_scenarios_table():
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -699,6 +911,8 @@ async def recreate_scenarios_table():
         cursor.execute("DROP TABLE IF EXISTS scenarios")
         conn.commit()
         logger.info("Old scenarios table dropped")
+        db_duration = time.time() - start_time
+        log_database_operation("recreate_scenarios_table", duration=db_duration)
         
         # Создаем новую таблицу scenarios с правильной структурой
         cursor.execute("""
@@ -720,7 +934,7 @@ async def recreate_scenarios_table():
         return {"message": "Scenarios table recreated successfully"}
         
     except Exception as e:
-        logger.error(f"Error recreating scenarios table: {e}")
+        logger.error(f"Error recreating scenarios table: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error recreating scenarios table: {str(e)}")
 
 @app.put("/api/bot-flow/scenarios/{scenario_id}")
@@ -734,6 +948,7 @@ async def update_scenario(scenario_id: str, scenario_data: dict):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -762,6 +977,8 @@ async def update_scenario(scenario_id: str, scenario_data: dict):
             """)
             conn.commit()
             logger.info("Table 'scenarios' created")
+        db_duration = time.time() - start_time
+        log_database_operation("update_scenario", duration=db_duration)
         
         # Проверяем, существует ли сценарий с таким ID
         cursor.execute("SELECT id FROM scenarios WHERE id = %s", (scenario_id,))
@@ -802,7 +1019,7 @@ async def update_scenario(scenario_id: str, scenario_data: dict):
         return {"message": "Scenario updated successfully", "scenario_id": scenario_id}
         
     except Exception as e:
-        logger.error(f"Error updating scenario: {e}")
+        logger.error(f"Error updating scenario: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error updating scenario: {str(e)}")
 
 @app.post("/api/bot-flow/scenarios")
@@ -816,6 +1033,7 @@ async def create_scenario(scenario_data: dict):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -844,6 +1062,8 @@ async def create_scenario(scenario_data: dict):
             """)
             conn.commit()
             logger.info("Table 'scenarios' created")
+        db_duration = time.time() - start_time
+        log_database_operation("create_scenario_flow", duration=db_duration)
         
         # Создаем новый сценарий в базе данных
         cursor.execute("""
@@ -866,7 +1086,7 @@ async def create_scenario(scenario_data: dict):
         return {"message": "Scenario created successfully", "scenario_id": new_id}
         
     except Exception as e:
-        logger.error(f"Error creating scenario: {e}")
+        logger.error(f"Error creating scenario: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error creating scenario: {str(e)}")
 
 @app.delete("/api/bot-flow/scenarios/{scenario_id}")
@@ -882,7 +1102,7 @@ async def delete_scenario(scenario_id: str):
         return {"message": "Scenario deleted successfully"}
         
     except Exception as e:
-        logger.error(f"Error deleting scenario: {e}")
+        logger.error(f"Error deleting scenario: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error deleting scenario: {str(e)}")
 
 # API endpoints для пользователей
@@ -894,6 +1114,7 @@ async def get_users(page: int = 1, limit: int = 20, search: str = ""):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -921,6 +1142,8 @@ async def get_users(page: int = 1, limit: int = 20, search: str = ""):
         count_query = f"SELECT COUNT(*) {base_query}"
         cursor.execute(count_query, params)
         total_count = cursor.fetchone()[0]
+        db_duration = time.time() - start_time
+        log_database_operation("get_users_count", duration=db_duration)
         
         # Получение пользователей с пагинацией
         offset = (page - 1) * limit
@@ -931,6 +1154,8 @@ async def get_users(page: int = 1, limit: int = 20, search: str = ""):
             LIMIT %s OFFSET %s
         """
         cursor.execute(users_query, params + [limit, offset])
+        db_duration = time.time() - start_time
+        log_database_operation("get_users_pagination", duration=db_duration)
         
         users = []
         for row in cursor.fetchall():
@@ -957,7 +1182,7 @@ async def get_users(page: int = 1, limit: int = 20, search: str = ""):
         }
         
     except Exception as e:
-        logger.error(f"Error getting users: {e}")
+        logger.error(f"Error getting users: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting users: {str(e)}")
 
 @app.post("/api/users")
@@ -968,6 +1193,7 @@ async def create_user(user_data: dict):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -1001,6 +1227,8 @@ async def create_user(user_data: dict):
         conn.commit()
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("create_user", duration=db_duration)
         
         logger.info(f"User created successfully: {user_id}")
         return {"message": "User created successfully", "user_id": user_id}
@@ -1008,7 +1236,7 @@ async def create_user(user_data: dict):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating user: {e}")
+        logger.error(f"Error creating user: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error creating user: {str(e)}")
 
 @app.get("/api/users/{user_id}")
@@ -1019,6 +1247,7 @@ async def get_user(user_id: int):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -1033,6 +1262,8 @@ async def get_user(user_id: int):
         user = cursor.fetchone()
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_user", duration=db_duration)
         
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -1054,7 +1285,7 @@ async def get_user(user_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting user {user_id}: {e}")
+        logger.error(f"Error getting user {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting user: {str(e)}")
 
 @app.get("/api/users/{user_id}/stats")
@@ -1065,6 +1296,7 @@ async def get_user_stats(user_id: int):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -1086,6 +1318,8 @@ async def get_user_stats(user_id: int):
         
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_user_stats", duration=db_duration)
         
         return {
             "total_checks": check_stats[0] or 0,
@@ -1098,7 +1332,7 @@ async def get_user_stats(user_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting user stats {user_id}: {e}")
+        logger.error(f"Error getting user stats {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting user stats: {str(e)}")
 
 @app.get("/api/users/{user_id}/checks")
@@ -1109,6 +1343,7 @@ async def get_user_checks(user_id: int, page: int = 1, limit: int = 20):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -1139,6 +1374,8 @@ async def get_user_checks(user_id: int, page: int = 1, limit: int = 20):
             ORDER BY created_at DESC
             LIMIT %s OFFSET %s
         """, (user_id, limit, offset))
+        db_duration = time.time() - start_time
+        log_database_operation("get_user_checks", duration=db_duration)
         
         checks = []
         for row in cursor.fetchall():
@@ -1159,7 +1396,7 @@ async def get_user_checks(user_id: int, page: int = 1, limit: int = 20):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting user checks {user_id}: {e}")
+        logger.error(f"Error getting user checks {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting user checks: {str(e)}")
 
 # API endpoints для сообщений
@@ -1171,6 +1408,7 @@ async def get_messages(page: int = 1, limit: int = 20):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -1215,6 +1453,8 @@ async def get_messages(page: int = 1, limit: int = 20):
         # Подсчет общего количества
         cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
         total_count = cursor.fetchone()[0]
+        db_duration = time.time() - start_time
+        log_database_operation("get_messages_count", duration=db_duration)
         
         # Получение сообщений с пагинацией
         offset = (page - 1) * limit
@@ -1227,6 +1467,8 @@ async def get_messages(page: int = 1, limit: int = 20):
             ORDER BY created_at DESC
             LIMIT %s OFFSET %s
         """, (limit, offset))
+        db_duration = time.time() - start_time
+        log_database_operation("get_messages_pagination", duration=db_duration)
         
         messages = []
         for row in cursor.fetchall():
@@ -1257,7 +1499,7 @@ async def get_messages(page: int = 1, limit: int = 20):
         }
         
     except Exception as e:
-        logger.error(f"Error getting messages: {e}")
+        logger.error(f"Error getting messages: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting messages: {str(e)}")
 
 # API endpoints для меню
@@ -1273,7 +1515,7 @@ async def get_menus(page: int = 1, limit: int = 20, language: str = "", menu_typ
                 "description": "Основное меню бота",
                 "menu_type": "main",
                 "language": "ru",
-                "keyboard_data": '[["🔍 Проверка", "💰 Пополнить"], ["👤 Личный кабинет", "📁 FAQ"]]',
+                "keyboard_data": '[["🔍 Проверка", "💰 Пополнить"], ["�� Личный кабинет", "📁 FAQ"]]',
                 "is_active": True,
                 "created_at": "2025-08-23T21:00:00",
                 "updated_at": "2025-08-23T21:00:00"
@@ -1289,7 +1531,7 @@ async def get_menus(page: int = 1, limit: int = 20, language: str = "", menu_typ
         }
         
     except Exception as e:
-        logger.error(f"Error getting menus: {e}")
+        logger.error(f"Error getting menus: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting menus: {str(e)}")
 
 # API endpoints для админ действий
@@ -1312,7 +1554,7 @@ async def get_admin_actions():
         return {"actions": actions}
         
     except Exception as e:
-        logger.error(f"Error getting admin actions: {e}")
+        logger.error(f"Error getting admin actions: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting admin actions: {str(e)}")
 
 # API endpoints для дашборда
@@ -1332,7 +1574,7 @@ async def get_dashboard_stats():
         }
         
     except Exception as e:
-        logger.error(f"Error getting dashboard stats: {e}")
+        logger.error(f"Error getting dashboard stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error getting dashboard stats: {str(e)}")
 
 # API endpoints для настроек
@@ -1345,6 +1587,7 @@ async def get_settings():
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -1363,11 +1606,13 @@ async def get_settings():
         
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_settings", duration=db_duration)
         
         logger.info(f"Retrieved {len(settings)} settings")
         return settings
     except Exception as e:
-        logger.error(f"Error getting settings: {e}")
+        logger.error(f"Error getting settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/settings/{key}")
@@ -1379,6 +1624,7 @@ async def get_setting(key: str):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -1391,6 +1637,8 @@ async def get_setting(key: str):
         row = cursor.fetchone()
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("get_setting", duration=db_duration)
         
         if row:
             return {
@@ -1404,7 +1652,7 @@ async def get_setting(key: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting setting {key}: {e}")
+        logger.error(f"Error getting setting {key}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/settings/{key}")
@@ -1416,6 +1664,7 @@ async def update_setting(key: str, setting_update: dict = Body(...)):
         if database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
+        start_time = time.time()
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
@@ -1442,12 +1691,14 @@ async def update_setting(key: str, setting_update: dict = Body(...)):
         conn.commit()
         cursor.close()
         conn.close()
+        db_duration = time.time() - start_time
+        log_database_operation("update_setting", duration=db_duration)
         
         logger.info(f"Setting {key} updated successfully")
         return {"status": "updated", "key": key}
         
     except Exception as e:
-        logger.error(f"Error updating setting {key}: {e}")
+        logger.error(f"Error updating setting {key}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

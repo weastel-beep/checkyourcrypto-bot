@@ -491,6 +491,7 @@ import BaseLayout from '@/components/Layout/BaseLayout.vue'
 import ScenarioModal from '@/components/BotFlow/ScenarioModal.vue'
 import PreviewModal from '@/components/BotFlow/PreviewModal.vue'
 import { botFlowService } from '@/services/botFlow'
+import logger from '@/utils/logger'
 
 export default {
   name: 'BotFlowDesigner',
@@ -520,20 +521,28 @@ export default {
     // Methods
     const loadScenarios = async () => {
       try {
+        logger.info('Loading scenarios', { component: 'BotFlowDesigner' })
         scenarios.value = await botFlowService.getScenarios()
+        logger.info('Scenarios loaded successfully', { 
+          component: 'BotFlowDesigner',
+          count: scenarios.value.length 
+        })
       } catch (error) {
-        console.error('Error loading scenarios:', error)
+        logger.error('Failed to load scenarios', error, { component: 'BotFlowDesigner' })
       }
     }
 
     const loadAvailableTexts = async () => {
       try {
-        console.log('🔄 Начинаю загрузку текстов...')
+        logger.info('Loading available texts', { component: 'BotFlowDesigner' })
         availableTexts.value = await botFlowService.getAvailableTexts()
-        console.log('📝 Загружено текстов:', availableTexts.value.length)
-        console.log('📝 Первые 5 текстов:', availableTexts.value.slice(0, 5))
+        logger.info('Texts loaded successfully', { 
+          component: 'BotFlowDesigner',
+          count: availableTexts.value.length,
+          sample: availableTexts.value.slice(0, 5).map(t => t.key)
+        })
       } catch (error) {
-        console.error('❌ Error loading texts:', error)
+        logger.error('Failed to load texts', error, { component: 'BotFlowDesigner' })
       }
     }
 
@@ -565,11 +574,19 @@ export default {
     }
 
     const selectScenario = (scenario) => {
+      logger.userAction('select_scenario', 'BotFlowDesigner', { 
+        scenarioId: scenario.id,
+        scenarioName: scenario.name 
+      })
       selectedScenario.value = scenario
       selectedStage.value = null
     }
 
     const selectStage = (stage) => {
+      logger.userAction('select_stage', 'BotFlowDesigner', { 
+        stageId: stage.id,
+        stageName: stage.name 
+      })
       selectedStage.value = { ...stage }
     }
 
@@ -591,25 +608,54 @@ export default {
 
     const saveScenario = async (scenario) => {
       try {
+        logger.userAction('save_scenario', 'BotFlowDesigner', { 
+          scenarioId: scenario.id,
+          scenarioName: scenario.name,
+          isNew: !scenario.id
+        })
+        
         if (scenario.id) {
           await botFlowService.updateScenario(scenario)
+          logger.info('Scenario updated successfully', { 
+            component: 'BotFlowDesigner',
+            scenarioId: scenario.id 
+          })
         } else {
           await botFlowService.createScenario(scenario)
+          logger.info('Scenario created successfully', { 
+            component: 'BotFlowDesigner',
+            scenarioName: scenario.name 
+          })
         }
         await loadScenarios()
         closeScenarioModal()
       } catch (error) {
-        console.error('Error saving scenario:', error)
+        logger.error('Failed to save scenario', error, { 
+          component: 'BotFlowDesigner',
+          scenarioId: scenario.id 
+        })
       }
     }
 
     const deleteScenario = async (scenario) => {
       if (confirm('Удалить сценарий?')) {
         try {
+          logger.userAction('delete_scenario', 'BotFlowDesigner', { 
+            scenarioId: scenario.id,
+            scenarioName: scenario.name 
+          })
+          
           await botFlowService.deleteScenario(scenario.id)
+          logger.info('Scenario deleted successfully', { 
+            component: 'BotFlowDesigner',
+            scenarioId: scenario.id 
+          })
           await loadScenarios()
         } catch (error) {
-          console.error('Error deleting scenario:', error)
+          logger.error('Failed to delete scenario', error, { 
+            component: 'BotFlowDesigner',
+            scenarioId: scenario.id 
+          })
         }
       }
     }
@@ -709,10 +755,22 @@ export default {
       if (!selectedScenario.value) return
       
       try {
+        logger.userAction('save_flow', 'BotFlowDesigner', { 
+          scenarioId: selectedScenario.value.id,
+          scenarioName: selectedScenario.value.name 
+        })
+        
         await botFlowService.updateScenario(selectedScenario.value)
+        logger.info('Flow saved successfully', { 
+          component: 'BotFlowDesigner',
+          scenarioId: selectedScenario.value.id 
+        })
         alert('Сценарий сохранен!')
       } catch (error) {
-        console.error('Error saving flow:', error)
+        logger.error('Failed to save flow', error, { 
+          component: 'BotFlowDesigner',
+          scenarioId: selectedScenario.value.id 
+        })
         alert('Ошибка при сохранении')
       }
     }
@@ -726,10 +784,22 @@ export default {
       if (!selectedScenario.value) return
       
       try {
+        logger.userAction('test_flow', 'BotFlowDesigner', { 
+          scenarioId: selectedScenario.value.id,
+          scenarioName: selectedScenario.value.name 
+        })
+        
         await botFlowService.testScenario(selectedScenario.value.id)
+        logger.info('Flow test started', { 
+          component: 'BotFlowDesigner',
+          scenarioId: selectedScenario.value.id 
+        })
         alert('Тест запущен! Проверьте бота.')
       } catch (error) {
-        console.error('Error testing flow:', error)
+        logger.error('Failed to test flow', error, { 
+          component: 'BotFlowDesigner',
+          scenarioId: selectedScenario.value.id 
+        })
         alert('Ошибка при запуске теста')
       }
     }
@@ -754,11 +824,22 @@ export default {
           
           // Автоматически сохраняем
           try {
-            console.log('🔄 Автосохранение этапа:', newStage.name, 'text_key:', newStage.text_key)
+            logger.info('Auto-saving stage', { 
+              component: 'BotFlowDesigner',
+              stageName: newStage.name,
+              textKey: newStage.text_key,
+              scenarioId: selectedScenario.value.id
+            })
             await botFlowService.updateScenario(selectedScenario.value)
-            console.log('✅ Этап автосохранен')
+            logger.info('Stage auto-saved successfully', { 
+              component: 'BotFlowDesigner',
+              stageName: newStage.name 
+            })
           } catch (error) {
-            console.error('❌ Ошибка автосохранения:', error)
+            logger.error('Failed to auto-save stage', error, { 
+              component: 'BotFlowDesigner',
+              stageName: newStage.name 
+            })
           }
         }
       }
@@ -766,7 +847,7 @@ export default {
 
     // Lifecycle
     onMounted(() => {
-      console.log('🚀 Flow Designer mounted, загружаю данные...')
+      logger.info('BotFlowDesigner component mounted', { component: 'BotFlowDesigner' })
       loadScenarios()
       loadAvailableTexts()
     })
