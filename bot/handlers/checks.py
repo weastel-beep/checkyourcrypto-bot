@@ -326,29 +326,69 @@ class CheckHandler(BaseHandler):
             return f"🔍 Проверка адреса {address} завершена.\n\nБлокчейн: {chain}\nТип: {check_type}"
 
     async def send_check_result_with_dynamic_buttons(self, update: Update, result_text: str, check_type: str, user):
-        """Отправить результат проверки с динамическими кнопками управления"""
+        """Отправить результат проверки с динамическими кнопками управления через Bot Flow Designer"""
         try:
             from .base import MessageFormatter, KeyboardBuilder
             from telegram.constants import ParseMode
+            from common.services import ScenarioService
 
             # Конвертируем в HTML
             html_text = MessageFormatter.convert_markdown_to_html_simple(result_text)
 
-            # Создаем динамическую клавиатуру на основе баланса
+            # Получаем сценарий из Bot Flow Designer
             async with async_session_maker() as session:
-                balance = user.balance or 0.0
-                paid_check_price = await SettingService.get_paid_check_price(session)
+                scenario = await ScenarioService.get_scenario_by_id("address_check_flow")
                 
-                if balance >= paid_check_price:
-                    # Богатый пользователь - показываем кнопки для заказа AI анализа
-                    buttons_setting = await SettingService.get_setting(session, "rich_result_buttons")
-                    button_text = buttons_setting if buttons_setting else "🛡️ Глубокий AI-анализ|📊 Показать пример|🏠 Главное меню"
+                if not scenario:
+                    logger.warning("Сценарий 'address_check_flow' не найден, используем fallback")
+                    # Fallback на старую логику
+                    balance = user.balance or 0.0
+                    paid_check_price = await SettingService.get_paid_check_price(session)
+                    
+                    if balance >= paid_check_price:
+                        buttons_setting = await SettingService.get_setting(session, "rich_result_buttons")
+                        button_text = buttons_setting if buttons_setting else "🛡️ Глубокий AI-анализ|📊 Показать пример|🏠 Главное меню"
+                    else:
+                        buttons_setting = await SettingService.get_setting(session, "poor_result_buttons")
+                        button_text = buttons_setting if buttons_setting else "📊 Показать пример|💰 Пополнить баланс|🏠 Главное меню"
+                    
+                    keyboard = KeyboardBuilder.create_dynamic_keyboard(button_text)
                 else:
-                    # Бедный пользователь - показываем кнопки для пополнения
-                    buttons_setting = await SettingService.get_setting(session, "poor_result_buttons")
-                    button_text = buttons_setting if buttons_setting else "📊 Показать пример|💰 Пополнить баланс|🏠 Главное меню"
-                
-                keyboard = KeyboardBuilder.create_dynamic_keyboard(button_text)
+                    # Используем Bot Flow Designer
+                    stages = scenario.get("stages", [])
+                    check_result_stage = None
+                    
+                    # Находим этап "Результат бесплатной проверки"
+                    for stage in stages:
+                        if stage.get("id") == "check_result_stage":
+                            check_result_stage = stage
+                            break
+                    
+                    if check_result_stage:
+                        # Оцениваем условия и получаем кнопки
+                        conditions = check_result_stage.get("conditions", [])
+                        balance = user.balance or 0.0
+                        paid_check_price = await SettingService.get_paid_check_price(session)
+                        
+                        buttons = []
+                        for condition in conditions:
+                            condition_type = condition.get("type")
+                            
+                            if condition_type == "balance_sufficient" and balance >= paid_check_price:
+                                buttons = condition.get("buttons", [])
+                                break
+                            elif condition_type == "balance_insufficient" and balance < paid_check_price:
+                                buttons = condition.get("buttons", [])
+                                break
+                        
+                        if buttons:
+                            keyboard = KeyboardBuilder.create_keyboard_from_buttons(buttons)
+                        else:
+                            # Fallback если условия не сработали
+                            keyboard = KeyboardBuilder.create_dynamic_keyboard("📊 Показать пример|💰 Пополнить баланс|🏠 Главное меню")
+                    else:
+                        # Fallback если этап не найден
+                        keyboard = KeyboardBuilder.create_dynamic_keyboard("📊 Показать пример|💰 Пополнить баланс|🏠 Главное меню")
 
             # Отправляем результат
             await update.message.reply_text(html_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
