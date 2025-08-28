@@ -124,14 +124,8 @@ class MainHandler(BaseHandler):
             async with async_session_maker() as session:
                 user_id = update.effective_user.id
                 
-                # Получаем шаблон примера из настроек
-                example_template_setting = await SettingService.get_setting(session, "example_template")
-                example_text_key = example_template_setting if example_template_setting else "example_result"
-                example_text = await TextService.get_text(session, example_text_key, "ru", user_id)
-                
-                # Получаем кнопки примера
-                example_buttons_setting = await SettingService.get_setting(session, "example_result_buttons")
-                example_buttons = example_buttons_setting if example_buttons_setting else "🤖 Заказать AI анализ|⬅️ Назад"
+                # Получаем шаблон примера
+                example_text = await TextService.get_text(session, "deep_analysis_example", "ru", user_id)
                 
                 # Заменяем плейсхолдеры
                 example_text = example_text.replace("{address}", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa")
@@ -140,8 +134,17 @@ class MainHandler(BaseHandler):
                 # Конвертируем в HTML
                 html_text = MessageFormatter.convert_markdown_to_html_simple(example_text)
                 
-                # Создаем клавиатуру с кнопками примера
-                keyboard = KeyboardBuilder.create_dynamic_keyboard(example_buttons)
+                # Создаем inline кнопки
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                
+                buttons = [
+                    [InlineKeyboardButton("🛡️ Заказать AI-анализ", callback_data="order_paid_check")],
+                    [InlineKeyboardButton("💰 Пополнить баланс", callback_data="top_up_balance")],
+                    [InlineKeyboardButton("🔙 Назад", callback_data="back_to_result")],
+                    [InlineKeyboardButton("👤 Личный кабинет", callback_data="personal_cabinet")]
+                ]
+                
+                keyboard = InlineKeyboardMarkup(buttons)
                 
                 # Отправляем пример
                 from telegram.constants import ParseMode
