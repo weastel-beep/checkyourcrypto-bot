@@ -130,12 +130,6 @@ class KeyboardBuilder:
                     row.append(KeyboardButton(buttons[i + 1]))
                 keyboard_rows.append(row)
             
-            # Добавляем кнопку "Главное меню" в последний ряд
-            if keyboard_rows:
-                keyboard_rows[-1].append(KeyboardButton("🏠 Главное меню"))
-            else:
-                keyboard_rows.append([KeyboardButton("🏠 Главное меню")])
-            
             return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True)
             
         except Exception as e:
