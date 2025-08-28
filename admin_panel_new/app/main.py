@@ -184,4 +184,48 @@ async def get_texts_for_flow():
         logger.error(f"Error getting texts for flow: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting texts for flow: {str(e)}")
 
+@app.get("/api/texts")
+async def get_texts_for_bot():
+    """Получение текстов для бота (старый формат)"""
+    try:
+        logger.info("GET /api/texts called")
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, category, language, content, version, created_at, updated_at
+            FROM bot_texts
+            WHERE is_active = true
+            ORDER BY category, language
+        """)
+        
+        texts = []
+        for row in cursor.fetchall():
+            text_id, category, language, content, version, created_at, updated_at = row
+            
+            texts.append({
+                "id": text_id,
+                "category": category,
+                "language": language,
+                "content": content,
+                "version": version,
+                "created_at": created_at.isoformat() if created_at else None,
+                "updated_at": updated_at.isoformat() if updated_at else None
+            })
+        
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"Returning {len(texts)} texts for bot (old format)")
+        return {"texts": texts}  # Старый формат для бота
+        
+    except Exception as e:
+        logger.error(f"Error getting texts for bot: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting texts for bot: {str(e)}")
+
 logger.info("All endpoints created successfully")
