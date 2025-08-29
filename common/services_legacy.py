@@ -255,8 +255,7 @@ class TextService:
                 async with http_session.get(api_url) as response:
                     print(f"🔍 TextService: API ответ статус: {response.status}")
                     if response.status == 200:
-                        data = await response.json()
-                        texts = data.get("texts", [])
+                        texts = await response.json()
                         print(f"🔍 TextService: Получено {len(texts)} текстов через API")
                         print(f"🔍 TextService: Первые 3 текста: {texts[:3]}")
                         logger.info(f"🔍 TextService: Получено {len(texts)} текстов через API")
