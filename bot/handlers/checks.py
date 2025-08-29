@@ -337,10 +337,10 @@ class CheckHandler(BaseHandler):
 
             # Получаем сценарий из Bot Flow Designer
             async with async_session_maker() as session:
-                scenario = await ScenarioService.get_scenario_by_id("address_check_flow")
+                scenario = await ScenarioService.get_scenario_by_id(session, 2)  # ID сценария "Проверка адреса v2"
                 
                 if not scenario:
-                    logger.warning("Сценарий 'address_check_flow' не найден, используем fallback")
+                    logger.warning("Сценарий с ID 2 не найден, используем fallback")
                     # Fallback на старую логику
                     balance = user.balance or 0.0
                     paid_check_price = await SettingService.get_paid_check_price(session)

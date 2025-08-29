@@ -178,6 +178,31 @@ class ScenarioService:
             return []
 
     @staticmethod
+    @get_retry_decorator("http")
+    @create_timeout_decorator(RetryConfig.HTTP_TIMEOUT)
+    async def get_scenario_by_id(session: AsyncSession, scenario_id: int) -> Optional[Dict[str, Any]]:
+        """Получить сценарий по ID через API"""
+        try:
+            import aiohttp
+
+            logger.info(f"🔍 ScenarioService: Запрашиваем сценарий с ID {scenario_id} через API")
+
+            async with aiohttp.ClientSession() as http_session:
+                async with http_session.get(f"{ScenarioService.get_api_base_url()}/api/bot-flow/scenarios/{scenario_id}") as response:
+                    if response.status == 200:
+                        scenario = await response.json()
+                        logger.info(f"✅ Получен сценарий с ID {scenario_id} через API: {scenario.get('name')}")
+                        return scenario
+                    else:
+                        error_msg = f"API вернул статус {response.status} для сценария с ID {scenario_id}"
+                        ErrorHandler.log_error(Exception(error_msg), "получение сценария по ID")
+                        return None
+
+        except Exception as e:
+            ErrorHandler.log_error(e, f"получение сценария с ID {scenario_id} через API")
+            return None
+
+    @staticmethod
     async def replace_placeholders_in_text(session: AsyncSession, text: str, user_id: int) -> str:
         """Заменить плейсхолдеры в тексте на реальные значения пользователя"""
         try:

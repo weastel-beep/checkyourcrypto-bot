@@ -440,7 +440,50 @@ async def get_texts_for_bot():
         logger.error(f"Error getting texts for bot: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting texts for bot: {str(e)}")
 
-# Эндпоинты для обновления сценариев
+# Эндпоинты для работы со сценариями
+@app.get("/api/bot-flow/scenarios/{scenario_id}")
+async def get_scenario_by_id(scenario_id: str):
+    """Получение сценария по ID"""
+    try:
+        logger.info(f"GET /api/bot-flow/scenarios/{scenario_id} called")
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, name, description, is_active, stages, created_at, updated_at
+            FROM scenarios 
+            WHERE id = %s
+        """, (scenario_id,))
+        
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Scenario {scenario_id} not found")
+        
+        scenario = {
+            "id": row[0],
+            "name": row[1],
+            "description": row[2],
+            "is_active": row[3],
+            "stages": json.loads(row[4]) if row[4] else [],
+            "created_at": row[5].isoformat() if row[5] else None,
+            "updated_at": row[6].isoformat() if row[6] else None
+        }
+        
+        logger.info(f"Scenario {scenario_id} retrieved successfully")
+        return scenario
+        
+    except Exception as e:
+        logger.error(f"Error getting scenario {scenario_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting scenario: {str(e)}")
+
 @app.put("/api/bot-flow/scenarios/{scenario_id}")
 async def update_scenario(scenario_id: str, scenario_data: dict = Body(...)):
     """Обновление сценария"""
