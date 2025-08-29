@@ -40,10 +40,9 @@ class ScenarioService:
             logger.info("🔍 ScenarioService: Запрашиваем активный сценарий через API")
 
             async with aiohttp.ClientSession() as http_session:
-                async with http_session.get(f"{ScenarioService.get_api_base_url()}/api/scenarios") as response:
+                async with http_session.get(f"{ScenarioService.get_api_base_url()}/api/bot-flow/scenarios") as response:
                     if response.status == 200:
-                        data = await response.json()
-                        scenarios = data.get("scenarios", [])
+                        scenarios = await response.json()
 
                         # Ищем активный сценарий
                         for scenario in scenarios:

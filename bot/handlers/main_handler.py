@@ -77,7 +77,59 @@ class MainHandler(BaseHandler):
         try:
             logger.info("🚀 Обработка команды /start")
 
-            # Получаем приветственное сообщение
+            # Получаем активный сценарий из конструктора
+            async with async_session_maker() as session:
+                from common.services_package.scenario_service import ScenarioService
+                
+                # Получаем активный сценарий
+                active_scenario = await ScenarioService.get_active_scenario(session)
+                
+                if active_scenario:
+                    logger.info(f"✅ Используем активный сценарий: {active_scenario.get('name')}")
+                    
+                    # Ищем этап Start в сценарии
+                    stages = active_scenario.get("stages", [])
+                    start_stage = None
+                    
+                    for stage in stages:
+                        if stage.get("trigger") == "command" and stage.get("trigger_value") == "/start":
+                            start_stage = stage
+                            break
+                    
+                    if start_stage:
+                        logger.info(f"✅ Найден этап Start в сценарии")
+                        
+                        # Получаем текст для этапа
+                        text_key = start_stage.get("text_key", "welcome")
+                        user_id = update.effective_user.id
+                        text = await TextService.get_text(session, text_key, "ru", user_id)
+                        
+                        # Конвертируем в HTML
+                        html_text = MessageFormatter.convert_markdown_to_html_simple(text)
+                        
+                        # Создаем клавиатуру из кнопок этапа
+                        buttons = start_stage.get("buttons", [])
+                        if buttons:
+                            keyboard = KeyboardBuilder.create_dynamic_keyboard("|".join(buttons))
+                        else:
+                            keyboard = KeyboardBuilder.create_main_menu_keyboard()
+                        
+                        # Отправляем приветствие
+                        from telegram.constants import ParseMode
+                        await update.message.reply_text(html_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+                        
+                        # Сохраняем текущий сценарий в контекст
+                        context.user_data["current_scenario"] = active_scenario
+                        context.user_data["current_stage_id"] = start_stage.get("id")
+                        
+                        logger.info("✅ Команда /start обработана через сценарий")
+                        return True
+                    else:
+                        logger.warning("⚠️ Этап Start не найден в активном сценарии")
+                else:
+                    logger.warning("⚠️ Активный сценарий не найден")
+
+            # Fallback к старому способу
             async with async_session_maker() as session:
                 user_id = update.effective_user.id
                 text = await TextService.get_text(session, "welcome", "ru", user_id)
@@ -93,7 +145,7 @@ class MainHandler(BaseHandler):
 
                 await update.message.reply_text(html_text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
-                logger.info("✅ Команда /start обработана")
+                logger.info("✅ Команда /start обработана через fallback")
                 return True
 
         except Exception as e:
