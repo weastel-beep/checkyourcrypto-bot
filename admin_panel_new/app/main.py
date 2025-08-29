@@ -15,7 +15,12 @@ import uuid
 # Импортируем единый API роутер
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from common.api.unified import router as unified_router
+try:
+    from common.api.unified import router as unified_router
+    logger.info("✅ Единый API роутер импортирован успешно")
+except ImportError as e:
+    logger.warning(f"⚠️ Не удалось импортировать единый API роутер: {e}")
+    unified_router = None
 
 # Простая настройка логирования
 logging.basicConfig(
@@ -98,9 +103,12 @@ logger.info("Simple auth endpoint created successfully")
 logger.info("Auth setup completed")
 
 # Подключаем единый API роутер
-logger.info("Connecting unified API router...")
-app.include_router(unified_router)
-logger.info("Unified API router connected successfully")
+if unified_router:
+    logger.info("Connecting unified API router...")
+    app.include_router(unified_router)
+    logger.info("Unified API router connected successfully")
+else:
+    logger.warning("⚠️ Единый API роутер не подключен, используем локальные эндпоинты")
 
 # API endpoints для Flow Designer
 @app.get("/api/bot-flow/scenarios")
@@ -237,5 +245,116 @@ async def get_texts_for_bot():
     except Exception as e:
         logger.error(f"Error getting texts for bot: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting texts for bot: {str(e)}")
+
+# Эндпоинты для обновления сценариев
+@app.put("/api/bot-flow/scenarios/{scenario_id}")
+async def update_scenario(scenario_id: str, scenario_data: dict = Body(...)):
+    """Обновление сценария"""
+    try:
+        logger.info(f"PUT /api/bot-flow/scenarios/{scenario_id} called")
+        logger.info(f"Scenario data: {scenario_data}")
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Обновляем сценарий
+        cursor.execute("""
+            UPDATE scenarios 
+            SET name = %s, description = %s, is_active = %s, updated_at = NOW()
+            WHERE id = %s
+        """, (
+            scenario_data.get('name', ''),
+            scenario_data.get('description', ''),
+            scenario_data.get('is_active', False),
+            scenario_id
+        ))
+        
+        if cursor.rowcount == 0:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail=f"Scenario {scenario_id} not found")
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"Scenario {scenario_id} updated successfully")
+        return {"status": "success", "message": f"Scenario {scenario_id} updated"}
+        
+    except Exception as e:
+        logger.error(f"Error updating scenario {scenario_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating scenario: {str(e)}")
+
+@app.post("/api/bot-flow/scenarios")
+async def create_scenario(scenario_data: dict = Body(...)):
+    """Создание нового сценария"""
+    try:
+        logger.info("POST /api/bot-flow/scenarios called")
+        logger.info(f"Scenario data: {scenario_data}")
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Создаем новый сценарий
+        cursor.execute("""
+            INSERT INTO scenarios (id, name, description, is_active, stages, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+        """, (
+            scenario_data.get('id', f"scenario_{int(time.time())}"),
+            scenario_data.get('name', ''),
+            scenario_data.get('description', ''),
+            scenario_data.get('is_active', False),
+            json.dumps(scenario_data.get('stages', []))
+        ))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logger.info("Scenario created successfully")
+        return {"status": "success", "message": "Scenario created"}
+        
+    except Exception as e:
+        logger.error(f"Error creating scenario: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creating scenario: {str(e)}")
+
+@app.delete("/api/bot-flow/scenarios/{scenario_id}")
+async def delete_scenario(scenario_id: str):
+    """Удаление сценария"""
+    try:
+        logger.info(f"DELETE /api/bot-flow/scenarios/{scenario_id} called")
+        
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        cursor.execute("DELETE FROM scenarios WHERE id = %s", (scenario_id,))
+        
+        if cursor.rowcount == 0:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail=f"Scenario {scenario_id} not found")
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"Scenario {scenario_id} deleted successfully")
+        return {"status": "success", "message": f"Scenario {scenario_id} deleted"}
+        
+    except Exception as e:
+        logger.error(f"Error deleting scenario {scenario_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting scenario: {str(e)}")
 
 logger.info("All endpoints created successfully")
