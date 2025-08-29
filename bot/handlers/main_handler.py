@@ -110,7 +110,17 @@ class MainHandler(BaseHandler):
                         # Создаем клавиатуру из кнопок этапа
                         buttons = start_stage.get("buttons", [])
                         if buttons:
-                            keyboard = KeyboardBuilder.create_dynamic_keyboard("|".join(buttons))
+                            # Заменяем ключи кнопок на реальные тексты
+                            button_texts = []
+                            for button_key in buttons:
+                                try:
+                                    button_text = await TextService.get_text(session, button_key, "ru", user_id)
+                                    button_texts.append(button_text)
+                                except Exception as e:
+                                    logger.warning(f"⚠️ Не удалось получить текст для кнопки '{button_key}': {e}")
+                                    button_texts.append(button_key)  # Используем ключ как fallback
+                            
+                            keyboard = KeyboardBuilder.create_dynamic_keyboard("|".join(button_texts))
                         else:
                             keyboard = KeyboardBuilder.create_main_menu_keyboard()
                         
