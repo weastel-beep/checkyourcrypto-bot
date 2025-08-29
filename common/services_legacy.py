@@ -250,7 +250,7 @@ class TextService:
 
             async with aiohttp.ClientSession() as http_session:
                 # Получаем все тексты через API
-                api_url = f"{TextService.get_api_base_url()}/api/texts"
+                api_url = f"{TextService.get_api_base_url()}/api/bot-flow/texts"
                 print(f"🔍 TextService: Запрашиваем API: {api_url}")
                 async with http_session.get(api_url) as response:
                     print(f"🔍 TextService: API ответ статус: {response.status}")
