@@ -20,7 +20,7 @@ export const useTextStore = defineStore('text', {
       this.error = null
       
       try {
-        const response = await api.get('/texts')
+        const response = await api.get('/unified/texts')
         this.texts = response.data
       } catch (error) {
         console.error('Error fetching texts:', error)
@@ -35,7 +35,7 @@ export const useTextStore = defineStore('text', {
       this.error = null
       
       try {
-        const response = await api.post('/texts', textData)
+        const response = await api.post('/unified/texts', textData)
         this.texts.push(response.data)
         return response.data
       } catch (error) {
@@ -52,7 +52,7 @@ export const useTextStore = defineStore('text', {
       this.error = null
       
       try {
-        const response = await api.put(`/texts/${id}`, textData)
+        const response = await api.put(`/unified/texts/${id}`, textData)
         const index = this.texts.findIndex(text => text.id === id)
         if (index !== -1) {
           this.texts[index] = response.data
@@ -72,7 +72,7 @@ export const useTextStore = defineStore('text', {
       this.error = null
       
       try {
-        await api.delete(`/texts/${id}`)
+        await api.delete(`/unified/texts/${id}`)
         this.texts = this.texts.filter(text => text.id !== id)
       } catch (error) {
         console.error('Error deleting text:', error)

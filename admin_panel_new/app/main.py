@@ -12,6 +12,11 @@ import sys
 import time
 import uuid
 
+# Импортируем единый API роутер
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from common.api.unified import router as unified_router
+
 # Простая настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -91,6 +96,11 @@ async def simple_login():
 
 logger.info("Simple auth endpoint created successfully")
 logger.info("Auth setup completed")
+
+# Подключаем единый API роутер
+logger.info("Connecting unified API router...")
+app.include_router(unified_router)
+logger.info("Unified API router connected successfully")
 
 # API endpoints для Flow Designer
 @app.get("/api/bot-flow/scenarios")

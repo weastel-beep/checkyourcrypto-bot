@@ -10,9 +10,9 @@ export const botFlowService = {
   // Получить все сценарии
   async getScenarios() {
     try {
-      console.log('🔄 Загружаю сценарии из API...')
-      const response = await api.get('/bot-flow/scenarios')
-      console.log('✅ Сценарии загружены из API:', response.data)
+      console.log('🔄 Загружаю сценарии из единого API...')
+      const response = await api.get('/unified/scenarios')
+      console.log('✅ Сценарии загружены из единого API:', response.data)
       return response.data
     } catch (error) {
       console.error('❌ Error fetching scenarios:', error)
@@ -326,7 +326,7 @@ export const botFlowService = {
   // Получить доступные тексты
   async getAvailableTexts() {
     try {
-      const response = await api.get('/bot-flow/texts')
+      const response = await api.get('/unified/texts')
       return response.data
     } catch (error) {
       console.error('Error fetching texts:', error)
