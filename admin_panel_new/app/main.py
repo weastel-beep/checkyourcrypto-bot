@@ -107,7 +107,7 @@ async def get_users():
         
         # Получаем пользователей из базы данных
         cursor.execute("""
-            SELECT id, tg_id, username, language, balance, referral_code, is_blocked, created_at, updated_at
+            SELECT tg_id, username, language, balance, referral_code, is_blocked, created_at, updated_at
             FROM users
             ORDER BY created_at DESC
             LIMIT 100
@@ -116,15 +116,15 @@ async def get_users():
         users = []
         for row in cursor.fetchall():
             users.append({
-                "id": row[0],
-                "tg_id": row[1],
-                "username": row[2],
-                "language": row[3],
-                "balance": float(row[4]) if row[4] else 0.0,
-                "referral_code": row[5],
-                "is_blocked": row[6],
-                "created_at": row[7].isoformat() if row[7] else None,
-                "updated_at": row[8].isoformat() if row[8] else None
+                "id": row[0],  # tg_id как id
+                "tg_id": row[0],
+                "username": row[1],
+                "language": row[2],
+                "balance": float(row[3]) if row[3] else 0.0,
+                "referral_code": row[4],
+                "is_blocked": row[5],
+                "created_at": row[6].isoformat() if row[6] else None,
+                "updated_at": row[7].isoformat() if row[7] else None
             })
         
         cursor.close()
