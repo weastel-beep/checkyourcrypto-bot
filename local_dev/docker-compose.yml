@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # PostgreSQL для локальной разработки
+  postgres_local:
+    image: postgres:15
+    container_name: checkyourcrypto_postgres_local
+    environment:
+      POSTGRES_DB: checkyourcrypto_local
+      POSTGRES_USER: local_user
+      POSTGRES_PASSWORD: local_password
+    ports:
+      - "5433:5432"  # Используем порт 5433 чтобы не конфликтовать с локальным PostgreSQL
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    networks:
+      - checkyourcrypto_network
+
+  # Redis для кэширования
+  redis_local:
+    image: redis:7-alpine
+    container_name: checkyourcrypto_redis_local
+    ports:
+      - "6380:6379"  # Используем порт 6380
+    volumes:
+      - redis_data:/data
+    networks:
+      - checkyourcrypto_network
+
+  # Admin Panel API (локальная версия)
+  local_admin_api:
+    build:
+      context: ../admin_panel_new
+      dockerfile: Dockerfile.backend
+    container_name: checkyourcrypto_local_admin_api
+    environment:
+      - DATABASE_URL=postgresql://local_user:local_password@postgres_local:5432/checkyourcrypto_local
+      - REDIS_URL=redis://redis_local:6379
+      - ENVIRONMENT=local
+      - PORT=8000
+    ports:
+      - "8001:8000"  # Локальная админка на порту 8001
+    depends_on:
+      - postgres_local
+      - redis_local
+    volumes:
+      - ../admin_panel_new:/app
+      - /app/venv  # Исключаем venv из монтирования
+    networks:
+      - checkyourcrypto_network
+    command: uvicorn admin_panel_new.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  checkyourcrypto_network:
+    driver: bridge
