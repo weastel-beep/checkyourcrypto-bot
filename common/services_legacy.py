@@ -260,18 +260,18 @@ class TextService:
                         print(f"🔍 TextService: Первые 3 текста: {texts[:3]}")
                         logger.info(f"🔍 TextService: Получено {len(texts)} текстов через API")
 
-                        # Ищем нужный текст
+                        # Ищем нужный текст по key (основной способ)
                         for text in texts:
-                            if text.get("category") == key and text.get("language") == language and text.get("is_active"):
-                                logger.info(f"✅ Текст '{key}' получен через API для языка {language}")
+                            if text.get("key") == key:
+                                logger.info(f"✅ Текст '{key}' получен через API")
                                 content = text.get("content", "")
                                 logger.info(f"🔍 TextService: Контент текста '{key}': {content[:100]}...")
                                 return await TextService._replace_price_placeholders(session, content, user_id, additional_data)
 
-                        # Если не найден по category, ищем по key (для обратной совместимости)
+                        # Если не найден по key, ищем по category (для обратной совместимости)
                         for text in texts:
-                            if text.get("key") == key and text.get("language") == language and text.get("is_active"):
-                                logger.info(f"✅ Текст '{key}' получен через API по key для языка {language}")
+                            if text.get("category") == key and text.get("language") == language and text.get("is_active"):
+                                logger.info(f"✅ Текст '{key}' получен через API для языка {language}")
                                 content = text.get("content", "")
                                 logger.info(f"🔍 TextService: Контент текста '{key}': {content[:100]}...")
                                 return await TextService._replace_price_placeholders(session, content, user_id, additional_data)
