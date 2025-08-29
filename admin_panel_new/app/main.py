@@ -12,16 +12,6 @@ import sys
 import time
 import uuid
 
-# Импортируем единый API роутер
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-try:
-    from common.api.unified import router as unified_router
-    logger.info("✅ Единый API роутер импортирован успешно")
-except ImportError as e:
-    logger.warning(f"⚠️ Не удалось импортировать единый API роутер: {e}")
-    unified_router = None
-
 # Простая настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -33,11 +23,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Логируем запуск приложения
-logger.info("=== SIMPLE API STARTUP ===")
+logger.info("=== ADMIN API STARTUP ===")
 logger.info(f"Python version: {sys.version}")
 logger.info(f"Current working directory: {os.getcwd()}")
 
-app = FastAPI(title="CheckYourCrypto Admin API - SIMPLE VERSION")
+app = FastAPI(title="CheckYourCrypto Admin API")
 
 logger.info("FastAPI app created")
 
@@ -101,14 +91,6 @@ async def simple_login():
 
 logger.info("Simple auth endpoint created successfully")
 logger.info("Auth setup completed")
-
-# Подключаем единый API роутер
-if unified_router:
-    logger.info("Connecting unified API router...")
-    app.include_router(unified_router)
-    logger.info("Unified API router connected successfully")
-else:
-    logger.warning("⚠️ Единый API роутер не подключен, используем локальные эндпоинты")
 
 # API endpoints для Flow Designer
 @app.get("/api/bot-flow/scenarios")
