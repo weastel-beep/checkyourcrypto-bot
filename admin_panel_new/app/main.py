@@ -92,6 +92,133 @@ async def simple_login():
 logger.info("Simple auth endpoint created successfully")
 logger.info("Auth setup completed")
 
+# API endpoints для Admin Panel
+@app.get("/api/users")
+async def get_users():
+    """Получение списка пользователей"""
+    try:
+        logger.info("GET /api/users called")
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Получаем пользователей из базы данных
+        cursor.execute("""
+            SELECT id, tg_id, username, language, balance, referral_code, is_blocked, created_at, updated_at
+            FROM users
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+        
+        users = []
+        for row in cursor.fetchall():
+            users.append({
+                "id": row[0],
+                "tg_id": row[1],
+                "username": row[2],
+                "language": row[3],
+                "balance": float(row[4]) if row[4] else 0.0,
+                "referral_code": row[5],
+                "is_blocked": row[6],
+                "created_at": row[7].isoformat() if row[7] else None,
+                "updated_at": row[8].isoformat() if row[8] else None
+            })
+        
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"Retrieved {len(users)} users")
+        return {"users": users, "total": len(users)}
+        
+    except Exception as e:
+        logger.error(f"Error getting users: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting users: {str(e)}")
+
+@app.get("/api/messages")
+async def get_messages():
+    """Получение сообщений"""
+    try:
+        logger.info("GET /api/messages called")
+        return {"messages": [], "total": 0}
+    except Exception as e:
+        logger.error(f"Error getting messages: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting messages: {str(e)}")
+
+@app.get("/api/dashboard/stats")
+async def get_dashboard_stats():
+    """Получение статистики дашборда"""
+    try:
+        logger.info("GET /api/dashboard/stats called")
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Получаем статистику
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_users = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '24 hours'")
+        new_users_24h = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '7 days'")
+        new_users_7d = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            "total_users": total_users,
+            "new_users_24h": new_users_24h,
+            "new_users_7d": new_users_7d,
+            "active_users": 0,
+            "total_checks": 0
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting dashboard stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting dashboard stats: {str(e)}")
+
+@app.get("/api/settings/paid_check_price")
+async def get_paid_check_price():
+    """Получение цены платной проверки"""
+    try:
+        logger.info("GET /api/settings/paid_check_price called")
+        return {"paid_check_price": 1.0}
+    except Exception as e:
+        logger.error(f"Error getting paid check price: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting paid check price: {str(e)}")
+
+@app.get("/api/auth/me")
+async def get_current_user():
+    """Получение текущего пользователя"""
+    try:
+        logger.info("GET /api/auth/me called")
+        return {
+            "id": 1,
+            "username": "admin",
+            "email": "admin@checkyourcrypto.com",
+            "role": "admin"
+        }
+    except Exception as e:
+        logger.error(f"Error getting current user: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting current user: {str(e)}")
+
+@app.get("/api/dashboard/charts/user-activity")
+async def get_user_activity():
+    """Получение активности пользователей"""
+    try:
+        logger.info("GET /api/dashboard/charts/user-activity called")
+        return {"data": [], "labels": []}
+    except Exception as e:
+        logger.error(f"Error getting user activity: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting user activity: {str(e)}")
+
 # API endpoints для Flow Designer
 @app.get("/api/bot-flow/scenarios")
 async def get_bot_flow_scenarios():
