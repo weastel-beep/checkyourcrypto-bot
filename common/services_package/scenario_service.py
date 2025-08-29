@@ -23,7 +23,7 @@ class ScenarioService:
     @staticmethod
     def get_api_base_url() -> str:
         """Получить базовый URL API из конфига"""
-        from common.services import get_api_base_url
+        from common.services_legacy import get_api_base_url
 
         base_url = get_api_base_url()
         logger.info(f"🔍 ScenarioService: Используем API URL: {base_url}")

@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 
 from common.database import async_session_maker
 from common.services_package.scenario_service import ScenarioService
-from common.services import TextService, UserService
+from common.services_legacy import TextService, UserService
 from .base import BaseHandler, TriggerDetector, HandlerResult
 
 logger = logging.getLogger(__name__)
@@ -315,6 +315,7 @@ class ScenarioHandler(BaseHandler):
         from common.services import SettingService
 
         async with async_session_maker() as session:
+            from common.services_legacy import SettingService
             paid_check_price = await SettingService.get_paid_check_price(session)
 
         if balance >= paid_check_price:

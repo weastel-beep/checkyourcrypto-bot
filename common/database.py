@@ -5,8 +5,9 @@ import logging
 import os
 import traceback
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import NullPool
+from sqlalchemy import create_engine
 
 from .config import settings
 
@@ -90,6 +91,26 @@ logger.info("🔍 DEBUG: Creating session factory...")
 async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 logger.info("🔍 DEBUG: Session factory created successfully")
 
+# Создание синхронного engine и session factory для единого API
+try:
+    logger.info("🔍 DEBUG: Creating sync engine...")
+    sync_engine = create_engine(
+        database_url,
+        echo=settings.debug,
+        poolclass=NullPool,  # Для Heroku
+        future=True,
+        connect_args={"check_same_thread": False} if "sqlite" in database_url else {},
+    )
+    logger.info(f"✅ Sync engine created successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to create sync engine: {e}")
+    raise
+
+# Создание синхронной session factory
+logger.info("🔍 DEBUG: Creating sync session factory...")
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
+logger.info("🔍 DEBUG: Sync session factory created successfully")
+
 
 async def get_async_session() -> AsyncSession:
     """Получить async сессию базы данных"""
@@ -98,6 +119,21 @@ async def get_async_session() -> AsyncSession:
             yield session
         finally:
             await session.close()
+
+
+def get_db():
+    """Dependency для получения синхронной сессии базы данных"""
+    db = SessionLocal()
+    try:
+        logger.info("🔍 Получена синхронная сессия базы данных")
+        yield db
+    except Exception as e:
+        logger.error(f"❌ Ошибка в синхронной сессии БД: {e}")
+        db.rollback()
+        raise
+    finally:
+        logger.info("🔒 Закрываем синхронную сессию базы данных")
+        db.close()
 
 
 async def init_db():

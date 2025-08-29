@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from common.database import async_session_maker
 from common.models import User, ReferralCode, ReferralReward
-from common.services import UserService
+from common.services_legacy import UserService
 
 logger = logging.getLogger(__name__)
 

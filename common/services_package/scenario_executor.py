@@ -30,7 +30,7 @@ class ScenarioExecutor:
         """
         try:
             from .scenario_service import ScenarioService
-            from common.services import TextService, UserService, SettingService
+            from common.services_legacy import TextService, UserService, SettingService
 
             # Получаем стадию
             stage = await ScenarioService.get_stage(scenario, stage_id)
@@ -135,7 +135,7 @@ class ScenarioExecutor:
     async def _check_condition(session: AsyncSession, condition_type: str, user_obj, context: Dict[str, Any]) -> bool:
         """Проверяет конкретное условие"""
         try:
-            from common.services import SettingService
+            from common.services_legacy import SettingService
 
             if condition_type == "user_blocked":
                 result = user_obj.is_blocked

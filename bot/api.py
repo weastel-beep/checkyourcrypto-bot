@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 
 from common.database import async_session_maker
-from common.models import BotText, Scenario, Setting
+from common.models_old import BotText, Scenario, Setting
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 

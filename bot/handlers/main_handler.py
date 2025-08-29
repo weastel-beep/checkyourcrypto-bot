@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from common.database import async_session_maker
-from common.services import TextService
+from common.services_legacy import TextService
 from .base import BaseHandler, TriggerDetector, MessageFormatter, KeyboardBuilder
 from .scenarios import ScenarioHandler
 from .checks import CheckHandler
@@ -161,7 +161,7 @@ class MainHandler(BaseHandler):
                 user_id = update.effective_user.id
                 
                 # Получаем пользователя
-                from common.services import UserService
+                from common.services_legacy import UserService
                 user = await UserService.get_user_by_tg_id(session, user_id)
                 
                 if not user:
@@ -170,7 +170,7 @@ class MainHandler(BaseHandler):
                 
                 # Проверяем баланс
                 balance = user.balance or 0.0
-                from common.services import SettingService
+                from common.services_legacy import SettingService
                 paid_check_price = await SettingService.get_paid_check_price(session)
                 
                 if balance >= paid_check_price:

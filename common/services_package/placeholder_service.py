@@ -59,7 +59,7 @@ class PlaceholderService:
             Текст с замененными плейсхолдерами
         """
         try:
-            from common.services import UserService, SettingService
+            from common.services_legacy import UserService, SettingService
 
             # 1. Находим ВСЕ плейсхолдеры в тексте
             placeholders = PlaceholderService.extract_placeholders_from_text(text)

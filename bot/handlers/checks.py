@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from common.database import async_session_maker
-from common.services import UserService, CheckService, TextService, SettingService
+from common.services_legacy import UserService, CheckService, TextService, SettingService
 from common.chain_detector import detect_chain, is_valid_crypto_address
 from .base import BaseHandler, HandlerResult
 

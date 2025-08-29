@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from common.database import async_session_maker
 from common.models import User, Payment, PaymentStatus
-from common.services import UserService
+from common.services_legacy import UserService
 from common.binance_pay_service import binance_pay_service, create_binance_payment, process_binance_payment
 
 logger = logging.getLogger(__name__)
