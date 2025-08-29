@@ -137,6 +137,91 @@ async def get_users():
         logger.error(f"Error getting users: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting users: {str(e)}")
 
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: int):
+    """Получение детальной информации о пользователе"""
+    try:
+        logger.info(f"GET /api/users/{user_id} called")
+        database_url = os.getenv('DATABASE_URL')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Получаем пользователя по tg_id
+        cursor.execute("""
+            SELECT tg_id, username, language, balance, referral_code, is_blocked, created_at, updated_at
+            FROM users
+            WHERE tg_id = %s
+        """, (user_id,))
+        
+        row = cursor.fetchone()
+        if not row:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+        
+        user = {
+            "id": row[0],
+            "tg_id": row[0],
+            "username": row[1],
+            "language": row[2],
+            "balance": float(row[3]) if row[3] else 0.0,
+            "referral_code": row[4],
+            "is_blocked": row[5],
+            "created_at": row[6].isoformat() if row[6] else None,
+            "updated_at": row[7].isoformat() if row[7] else None
+        }
+        
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"Retrieved user {user_id}")
+        return user
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting user: {str(e)}")
+
+@app.get("/api/users/{user_id}/stats")
+async def get_user_stats(user_id: int):
+    """Получение статистики пользователя"""
+    try:
+        logger.info(f"GET /api/users/{user_id}/stats called")
+        return {
+            "total_checks": 0,
+            "paid_checks": 0,
+            "free_checks": 0,
+            "last_check": None,
+            "total_spent": 0.0
+        }
+    except Exception as e:
+        logger.error(f"Error getting user stats {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting user stats: {str(e)}")
+
+@app.get("/api/users/{user_id}/checks")
+async def get_user_checks(user_id: int):
+    """Получение проверок пользователя"""
+    try:
+        logger.info(f"GET /api/users/{user_id}/checks called")
+        return {"checks": [], "total": 0}
+    except Exception as e:
+        logger.error(f"Error getting user checks {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting user checks: {str(e)}")
+
+@app.get("/api/admin/action")
+async def get_admin_actions():
+    """Получение действий администратора"""
+    try:
+        logger.info("GET /api/admin/action called")
+        return {"actions": [], "total": 0}
+    except Exception as e:
+        logger.error(f"Error getting admin actions: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting admin actions: {str(e)}")
+
 @app.get("/api/messages")
 async def get_messages():
     """Получение сообщений"""
