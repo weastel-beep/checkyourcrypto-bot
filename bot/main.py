@@ -15,7 +15,6 @@ from common.config import settings
 from bot.handlers import handle_all_messages, cmd_start
 from bot.health import router as health_router
 from bot.monitoring_endpoints import router as monitoring_router
-from bot.api import api_router
 from common.api.unified import router as unified_router
 from bot.middleware import MetricsMiddleware, LoggingMiddleware, SecurityMiddleware, ErrorHandlingMiddleware
 
@@ -83,10 +82,7 @@ app.include_router(health_router)
 # Подключаем monitoring router
 app.include_router(monitoring_router)
 
-# Подключаем API router (старый)
-app.include_router(api_router)
-
-# Подключаем единый API router
+# Подключаем единый API router (для внутренних нужд бота)
 app.include_router(unified_router)
 
 # Добавляем middleware
